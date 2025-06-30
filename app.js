@@ -767,59 +767,392 @@ function toggleMic() {
     }
 }
 
+// STEP 1: Enhanced Screen Share Implementation
+// Add this to your app.js to replace the existing toggleScreenShare function
+
 async function toggleScreenShare() {
+    console.log('Toggle screen share clicked, current state:', isScreenSharing);
+    
     try {
         if (!isScreenSharing) {
-            // Start screen sharing
+            console.log('Starting screen share...');
+            
+            // Request screen share with specific constraints
             screenStream = await navigator.mediaDevices.getDisplayMedia({ 
                 video: {
-                    width: { ideal: 1920 },
-                    height: { ideal: 1080 },
-                    frameRate: { ideal: 30 }
+                    width: { ideal: 1920, max: 1920 },
+                    height: { ideal: 1080, max: 1080 },
+                    frameRate: { ideal: 15, max: 30 } // Lower framerate for better performance
                 }, 
-                audio: true 
+                audio: {
+                    echoCancellation: true,
+                    noiseSuppression: true,
+                    sampleRate: 44100
+                }
             });
             
+            console.log('Screen stream obtained:', screenStream);
+            
+            // Add your own screen to the UI immediately
             addScreenShareElement('screen-local', 'Your Screen Share', screenStream);
             
-            document.getElementById('screenBtn').textContent = '⏹️ Stop';
-            document.getElementById('screenBtn').className = 'btn btn-danger';
+            // Update button state
+            const screenBtn = document.getElementById('screenBtn');
+            screenBtn.textContent = '⏹️ Stop Share';
+            screenBtn.className = 'btn btn-danger';
             isScreenSharing = true;
+            
+            // Play notification
             playNotificationSound('screen_start');
             showToast('Screen sharing started');
 
-            // Notify server
-            socket.emit('screen-share-start', {});
+            console.log('Notifying server about screen share start...');
+            // Notify server that you started screen sharing
+            if (socket && currentUser) {
+                socket.emit('screen-share-start', {
+                    userId: currentUser.id,
+                    username: currentUser.name
+                });
+            }
 
-            // Set up screen share connections with all users
-            Object.keys(peerConnections).forEach(userId => {
-                const user = findUserById(userId);
-                if (user) {
-                    setupScreenShareConnection(user);
-                }
-            });
+            // Set up WebRTC connections for screen sharing with all connected users
+            console.log('Setting up screen share connections with users:', Object.keys(peerConnections));
+            
+            for (const userId in peerConnections) {
+                await setupScreenShareWithUser(userId);
+            }
 
-            // Handle screen share ending
+            // Handle when user stops sharing (X button or ESC)
             screenStream.getVideoTracks()[0].onended = () => {
+                console.log('Screen share ended by user');
                 stopScreenShare();
             };
 
-            // Notify server of status change
-            if (socket && currentUser) {
-                socket.emit('user-status', {
-                    isMuted: isMuted,
-                    isScreenSharing: isScreenSharing
-                });
-            }
+            // Update user status
+            socket.emit('user-status', {
+                isMuted: isMuted,
+                isScreenSharing: true
+            });
+
         } else {
+            console.log('Stopping screen share...');
             stopScreenShare();
         }
     } catch (error) {
-        console.error('Error sharing screen:', error);
-        showToast('Could not share screen. Please try again.');
+        console.error('Error with screen sharing:', error);
+        
+        if (error.name === 'NotAllowedError') {
+            showToast('Screen sharing permission denied');
+        } else if (error.name === 'NotSupportedError') {
+            showToast('Screen sharing not supported on this browser');
+        } else {
+            showToast('Could not start screen sharing: ' + error.message);
+        }
+        
         playNotificationSound('error');
+        
+        // Reset button state on error
+        const screenBtn = document.getElementById('screenBtn');
+        screenBtn.textContent = '📺 Screen';
+        screenBtn.className = 'btn btn-primary';
+        isScreenSharing = false;
     }
 }
+
+// STEP 2: Enhanced Screen Share WebRTC Setup
+async function setupScreenShareWithUser(userId) {
+    if (!screenStream) {
+        console.log('No screen stream available for user:', userId);
+        return;
+    }
+
+    console.log('Setting up screen share connection with user:', userId);
+
+    try {
+        // Create a new peer connection specifically for screen sharing
+        const screenPeerConnection = new RTCPeerConnection(ICE_SERVERS);
+        screenPeerConnections[userId] = screenPeerConnection;
+
+        // Add screen stream tracks to the connection
+        screenStream.getTracks().forEach(track => {
+            console.log('Adding screen track to peer connection:', track.kind);
+            screenPeerConnection.addTrack(track, screenStream);
+        });
+
+        // Handle incoming screen stream from remote user
+        screenPeerConnection.ontrack = (event) => {
+            console.log('Received screen track from user:', userId);
+            const [remoteScreenStream] = event.streams;
+            
+            // Find user info
+            const user = findUserById(userId);
+            const userName = user ? user.username : `User ${userId}`;
+            
+            // Display the remote screen share
+            addScreenShareElement(`screen-${userId}`, `${userName}'s Screen`, remoteScreenStream);
+        };
+
+        // Handle ICE candidates for screen sharing
+        screenPeerConnection.onicecandidate = (event) => {
+            if (event.candidate) {
+                console.log('Sending screen share ICE candidate to:', userId);
+                socket.emit('webrtc-ice-candidate', {
+                    targetUserId: userId,
+                    candidate: event.candidate,
+                    senderId: currentUser.id,
+                    isScreenShare: true
+                });
+            }
+        };
+
+        // Create and send offer for screen sharing
+        const offer = await screenPeerConnection.createOffer();
+        await screenPeerConnection.setLocalDescription(offer);
+
+        console.log('Sending screen share offer to user:', userId);
+        socket.emit('webrtc-offer', {
+            targetUserId: userId,
+            offer: offer,
+            callerId: currentUser.id,
+            isScreenShare: true
+        });
+
+    } catch (error) {
+        console.error('Error setting up screen share with user:', userId, error);
+    }
+}
+
+// STEP 3: Enhanced Stop Screen Share
+function stopScreenShare() {
+    console.log('Stopping screen share...');
+    
+    if (screenStream) {
+        // Stop all tracks
+        screenStream.getTracks().forEach(track => {
+            console.log('Stopping screen track:', track.kind);
+            track.stop();
+        });
+        screenStream = null;
+    }
+    
+    // Close all screen share peer connections
+    Object.keys(screenPeerConnections).forEach(userId => {
+        console.log('Closing screen share connection with:', userId);
+        screenPeerConnections[userId].close();
+        delete screenPeerConnections[userId];
+    });
+    
+    // Remove your screen share from UI
+    removeScreenShareElement('screen-local');
+    
+    // Reset button
+    const screenBtn = document.getElementById('screenBtn');
+    screenBtn.textContent = '📺 Screen';
+    screenBtn.className = 'btn btn-primary';
+    isScreenSharing = false;
+    
+    // Notifications
+    playNotificationSound('screen_stop');
+    showToast('Screen sharing stopped');
+
+    // Notify server
+    if (socket && currentUser) {
+        socket.emit('screen-share-stop', {
+            userId: currentUser.id,
+            username: currentUser.name
+        });
+
+        socket.emit('user-status', {
+            isMuted: isMuted,
+            isScreenSharing: false
+        });
+    }
+}
+
+// STEP 4: Enhanced Screen Share Element Creation
+function addScreenShareElement(id, label, stream) {
+    console.log('Adding screen share element:', id, label);
+    
+    const videoGrid = document.getElementById('videoGrid');
+
+    // Remove existing screen share if any
+    removeScreenShareElement(id);
+
+    const container = document.createElement('div');
+    container.className = 'video-container screen-share-container';
+    container.id = `video-${id}`;
+    container.style.minHeight = '300px'; // Ensure reasonable size
+
+    const video = document.createElement('video');
+    video.className = 'video-element';
+    video.autoplay = true;
+    video.muted = true; // Prevent feedback
+    video.playsInline = true; // Important for mobile
+    video.controls = false;
+    
+    // Apply volume setting
+    video.volume = outputVolumeLevel / 100;
+    
+    if (stream) {
+        video.srcObject = stream;
+        
+        // Debug: Log when video starts playing
+        video.onloadedmetadata = () => {
+            console.log('Screen share video loaded:', {
+                videoWidth: video.videoWidth,
+                videoHeight: video.videoHeight,
+                duration: video.duration
+            });
+        };
+        
+        video.onplay = () => {
+            console.log('Screen share video started playing');
+        };
+        
+        video.onerror = (error) => {
+            console.error('Screen share video error:', error);
+        };
+    }
+
+    // Create container content
+    container.innerHTML = `
+        <div style="position: relative; width: 100%; height: 100%; min-height: 250px;">
+            ${video.outerHTML}
+            <div class="video-label" style="position: absolute; bottom: 8px; left: 8px; background: rgba(0,0,0,0.8); padding: 6px 10px; border-radius: 4px; color: white; font-size: 12px;">
+                📺 ${label}
+            </div>
+        </div>
+    `;
+
+    videoGrid.appendChild(container);
+    
+    // Get the actual video element from the container
+    const actualVideo = container.querySelector('video');
+    if (stream && actualVideo) {
+        actualVideo.srcObject = stream;
+    }
+
+    showToast(`Screen sharing: ${label}`);
+}
+
+// STEP 5: Debug Function - Add this to test screen sharing
+function debugScreenShare() {
+    console.log('=== SCREEN SHARE DEBUG INFO ===');
+    console.log('isScreenSharing:', isScreenSharing);
+    console.log('screenStream:', screenStream);
+    console.log('screenPeerConnections:', screenPeerConnections);
+    console.log('Browser supports getDisplayMedia:', !!navigator.mediaDevices?.getDisplayMedia);
+    console.log('Current user:', currentUser);
+    console.log('Socket connected:', socket?.connected);
+    console.log('Peer connections:', Object.keys(peerConnections));
+    
+    // Test browser compatibility
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
+        console.error('❌ getDisplayMedia not supported');
+        showToast('Screen sharing not supported in this browser');
+        return false;
+    }
+    
+    console.log('✅ Browser supports screen sharing');
+    return true;
+}
+
+// STEP 6: Enhanced WebRTC Offer Handler for Screen Sharing
+async function handleWebRTCOfferEnhanced(data) {
+    try {
+        console.log('Received WebRTC offer:', {
+            from: data.callerId,
+            isScreenShare: data.isScreenShare,
+            callerName: data.callerName
+        });
+        
+        const { offer, callerId, isScreenShare, callerName } = data;
+        
+        // Choose the right connection map
+        const connections = isScreenShare ? screenPeerConnections : peerConnections;
+        
+        // Create peer connection
+        const peerConnection = new RTCPeerConnection(ICE_SERVERS);
+        connections[callerId] = peerConnection;
+        
+        // Add local stream (voice or screen)
+        const streamToAdd = isScreenShare ? screenStream : localStream;
+        if (streamToAdd) {
+            streamToAdd.getTracks().forEach(track => {
+                console.log(`Adding ${isScreenShare ? 'screen' : 'voice'} track:`, track.kind);
+                peerConnection.addTrack(track, streamToAdd);
+            });
+        }
+        
+        // Handle incoming stream
+        peerConnection.ontrack = (event) => {
+            console.log(`Received ${isScreenShare ? 'screen' : 'voice'} track from:`, callerName);
+            const [remoteStream] = event.streams;
+            
+            if (isScreenShare) {
+                addScreenShareElement(`screen-${callerId}`, `${callerName}'s Screen`, remoteStream);
+            } else {
+                addVoiceElement(callerId, callerName, remoteStream, false);
+                connectedUsers.add(callerId);
+            }
+        };
+        
+        // Handle ICE candidates
+        peerConnection.onicecandidate = (event) => {
+            if (event.candidate) {
+                socket.emit('webrtc-ice-candidate', {
+                    targetUserId: callerId,
+                    candidate: event.candidate,
+                    senderId: currentUser.id,
+                    isScreenShare: isScreenShare
+                });
+            }
+        };
+        
+        // Set remote description and create answer
+        await peerConnection.setRemoteDescription(offer);
+        const answer = await peerConnection.createAnswer();
+        await peerConnection.setLocalDescription(answer);
+        
+        socket.emit('webrtc-answer', {
+            targetUserId: callerId,
+            answer: answer,
+            answererId: currentUser.id,
+            isScreenShare: isScreenShare
+        });
+        
+        console.log(`✅ ${isScreenShare ? 'Screen share' : 'Voice'} connection established with:`, callerName);
+        
+    } catch (error) {
+        console.error('Error handling WebRTC offer:', error);
+    }
+}
+
+// STEP 7: Browser Compatibility Check
+function checkScreenShareSupport() {
+    const support = {
+        getDisplayMedia: !!navigator.mediaDevices?.getDisplayMedia,
+        webRTC: !!window.RTCPeerConnection,
+        browser: getBrowserInfo()
+    };
+    
+    console.log('Screen share support:', support);
+    return support;
+}
+
+function getBrowserInfo() {
+    const ua = navigator.userAgent;
+    if (ua.includes('Chrome')) return 'Chrome';
+    if (ua.includes('Firefox')) return 'Firefox';
+    if (ua.includes('Safari')) return 'Safari';
+    if (ua.includes('Edge')) return 'Edge';
+    return 'Unknown';
+}
+
+// Call this when page loads to check compatibility
+document.addEventListener('DOMContentLoaded', () => {
+    checkScreenShareSupport();
+});
 
 function stopScreenShare() {
     if (screenStream) {
