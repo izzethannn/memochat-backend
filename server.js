@@ -20,13 +20,21 @@ app.use(cors({
     credentials: true
 }));
 
-// Rate limiting
+// Enhanced rate limiting
 const limiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
     max: 100, // limit each IP to 100 requests per windowMs
     message: 'Too many requests from this IP'
 });
 app.use(limiter);
+
+// Chat message rate limiting
+const chatLimiter = rateLimit({
+    windowMs: 60 * 1000, // 1 minute
+    max: 30, // limit each IP to 30 messages per minute
+    message: 'Too many messages. Please slow down.',
+    skipSuccessfulRequests: true
+});
 
 app.use(express.json());
 app.use(express.static('public'));
@@ -44,15 +52,19 @@ const io = socketIo(server, {
 // Data structures to manage rooms and users
 const rooms = new Map();
 const users = new Map();
+const roomPasswords = new Map(); // Store room passwords
+const userMessageHistory = new Map(); // Track user message history for spam protection
 
 // Room management
 class Room {
-    constructor(name) {
+    constructor(name, password = null) {
         this.name = name;
         this.users = new Map();
         this.createdAt = new Date();
         this.messages = [];
         this.maxMessages = 100;
+        this.password = password;
+        this.isPasswordProtected = !!password;
     }
 
     addUser(user) {
@@ -89,6 +101,11 @@ class Room {
     isEmpty() {
         return this.users.size === 0;
     }
+
+    verifyPassword(password) {
+        if (!this.isPasswordProtected) return true;
+        return this.password === password;
+    }
 }
 
 // User management
@@ -103,7 +120,66 @@ class User {
         this.isInCall = false;
         this.callPartner = null;
         this.joinedAt = new Date();
+        this.messageCount = 0;
+        this.lastMessageTime = 0;
     }
+}
+
+// Spam protection functions
+function checkSpam(userId, socketId) {
+    const now = Date.now();
+    const userHistory = userMessageHistory.get(socketId) || { messages: [], lastReset: now };
+    
+    // Reset counter every minute
+    if (now - userHistory.lastReset > 60000) {
+        userHistory.messages = [];
+        userHistory.lastReset = now;
+    }
+    
+    // Add current message
+    userHistory.messages.push(now);
+    
+    // Check if user is sending too many messages
+    const recentMessages = userHistory.messages.filter(time => now - time < 60000);
+    userHistory.messages = recentMessages;
+    
+    userMessageHistory.set(socketId, userHistory);
+    
+    // Allow max 20 messages per minute
+    return recentMessages.length > 20;
+}
+
+function checkMessageSimilarity(message, userHistory) {
+    const recentMessages = userHistory.messages || [];
+    const similarCount = recentMessages.filter(msg => 
+        msg.content && levenshteinDistance(msg.content.toLowerCase(), message.toLowerCase()) < 3
+    ).length;
+    
+    return similarCount > 3; // Flag if 3+ similar messages
+}
+
+function levenshteinDistance(str1, str2) {
+    const matrix = [];
+    for (let i = 0; i <= str2.length; i++) {
+        matrix[i] = [i];
+    }
+    for (let j = 0; j <= str1.length; j++) {
+        matrix[0][j] = j;
+    }
+    for (let i = 1; i <= str2.length; i++) {
+        for (let j = 1; j <= str1.length; j++) {
+            if (str2.charAt(i - 1) === str1.charAt(j - 1)) {
+                matrix[i][j] = matrix[i - 1][j - 1];
+            } else {
+                matrix[i][j] = Math.min(
+                    matrix[i - 1][j - 1] + 1,
+                    matrix[i][j - 1] + 1,
+                    matrix[i - 1][j] + 1
+                );
+            }
+        }
+    }
+    return matrix[str2.length][str1.length];
 }
 
 // Utility functions
@@ -113,7 +189,7 @@ function sanitizeInput(input) {
 
 function isValidRoomName(roomName) {
     const validRooms = ['general', 'gaming', 'study', 'music', 'private'];
-    return validRooms.includes(roomName);
+    return validRooms.includes(roomName) || /^custom_[a-zA-Z0-9_]+$/.test(roomName);
 }
 
 function isValidUsername(username) {
@@ -123,14 +199,51 @@ function isValidUsername(username) {
            /^[a-zA-Z0-9_\-\s]+$/.test(username);
 }
 
+function generateRoomId() {
+    return 'custom_' + Math.random().toString(36).substr(2, 9);
+}
+
 // Socket.IO connection handling
 io.on('connection', (socket) => {
     console.log(`New connection: ${socket.id}`);
     
+    // Handle creating password-protected room
+    socket.on('create-private-room', (data) => {
+        try {
+            const { username, password } = data;
+            
+            if (!isValidUsername(username)) {
+                socket.emit('error', { message: 'Invalid username' });
+                return;
+            }
+            
+            if (!password || password.length < 4) {
+                socket.emit('error', { message: 'Password must be at least 4 characters' });
+                return;
+            }
+            
+            const roomId = generateRoomId();
+            const room = new Room(roomId, password);
+            rooms.set(roomId, room);
+            roomPasswords.set(roomId, password);
+            
+            socket.emit('private-room-created', {
+                roomId: roomId,
+                password: password
+            });
+            
+            console.log(`Private room created: ${roomId}`);
+            
+        } catch (error) {
+            console.error('Error creating private room:', error);
+            socket.emit('error', { message: 'Failed to create private room' });
+        }
+    });
+    
     // Handle user joining a room
     socket.on('join-room', async (data) => {
         try {
-            const { userId, username, room } = data;
+            const { userId, username, room, password } = data;
             
             // Validate input
             if (!userId || !username || !room) {
@@ -156,6 +269,12 @@ io.on('connection', (socket) => {
             }
             const roomObj = rooms.get(room);
             
+            // Check password if room is password protected
+            if (roomObj.isPasswordProtected && !roomObj.verifyPassword(password)) {
+                socket.emit('error', { message: 'Incorrect password' });
+                return;
+            }
+            
             // Create user
             const user = new User(userId, sanitizedUsername, socket.id);
             user.room = room;
@@ -171,7 +290,8 @@ io.on('connection', (socket) => {
             socket.emit('room-joined', {
                 room: room,
                 users: roomUsers,
-                messages: roomObj.messages.slice(-20) // Send last 20 messages
+                messages: roomObj.messages.slice(-20), // Send last 20 messages
+                isPasswordProtected: roomObj.isPasswordProtected
             });
             
             // Notify other users in room
@@ -206,7 +326,7 @@ io.on('connection', (socket) => {
         handleUserLeave(socket, data?.userId);
     });
     
-    // Handle chat messages
+    // Enhanced chat message handling with spam protection
     socket.on('chat-message', (data) => {
         try {
             const user = users.get(socket.id);
@@ -220,7 +340,27 @@ io.on('connection', (socket) => {
                 return;
             }
             
+            // Check for spam
+            if (checkSpam(user.id, socket.id)) {
+                socket.emit('error', { message: 'You are sending messages too quickly. Please slow down.' });
+                return;
+            }
+            
             const sanitizedMessage = sanitizeInput(message);
+            
+            // Check for message similarity (simple spam detection)
+            const userHistory = userMessageHistory.get(socket.id) || { messages: [] };
+            if (checkMessageSimilarity(sanitizedMessage, userHistory)) {
+                socket.emit('error', { message: 'Please avoid sending repetitive messages.' });
+                return;
+            }
+            
+            // Store message in user history
+            if (!userHistory.messages) userHistory.messages = [];
+            userHistory.messages.push({ content: sanitizedMessage, time: Date.now() });
+            userHistory.messages = userHistory.messages.slice(-10); // Keep last 10 messages
+            userMessageHistory.set(socket.id, userHistory);
+            
             const room = rooms.get(user.room);
             
             const chatMessage = {
@@ -242,9 +382,9 @@ io.on('connection', (socket) => {
         }
     });
     
-    // Enhanced WebRTC signaling for voice chat
+    // Enhanced WebRTC signaling for voice chat and screen sharing
     socket.on('webrtc-offer', (data) => {
-        const { targetUserId, offer, callerId } = data;
+        const { targetUserId, offer, callerId, isScreenShare } = data;
         const user = users.get(socket.id);
         
         if (user && user.room) {
@@ -254,15 +394,16 @@ io.on('connection', (socket) => {
                 io.to(targetUser.socketId).emit('webrtc-offer', {
                     offer: offer,
                     callerId: callerId,
-                    callerName: user.username
+                    callerName: user.username,
+                    isScreenShare: isScreenShare || false
                 });
-                console.log(`WebRTC offer from ${user.username} to ${targetUser.username}`);
+                console.log(`WebRTC offer from ${user.username} to ${targetUser.username}${isScreenShare ? ' (screen share)' : ''}`);
             }
         }
     });
 
     socket.on('webrtc-answer', (data) => {
-        const { targetUserId, answer, answererId } = data;
+        const { targetUserId, answer, answererId, isScreenShare } = data;
         const user = users.get(socket.id);
         
         if (user && user.room) {
@@ -272,9 +413,10 @@ io.on('connection', (socket) => {
                 io.to(targetUser.socketId).emit('webrtc-answer', {
                     answer: answer,
                     answererId: answererId,
-                    answererName: user.username
+                    answererName: user.username,
+                    isScreenShare: isScreenShare || false
                 });
-                console.log(`WebRTC answer from ${user.username} to ${targetUser.username}`);
+                console.log(`WebRTC answer from ${user.username} to ${targetUser.username}${isScreenShare ? ' (screen share)' : ''}`);
             }
         }
     });
@@ -292,6 +434,37 @@ io.on('connection', (socket) => {
                     senderId: senderId
                 });
             }
+        }
+    });
+
+    // Handle screen share specific events
+    socket.on('screen-share-start', (data) => {
+        const user = users.get(socket.id);
+        if (user && user.room) {
+            user.isScreenSharing = true;
+            
+            // Notify all users in room about screen share
+            socket.to(user.room).emit('user-screen-share-start', {
+                userId: user.id,
+                username: user.username
+            });
+            
+            console.log(`${user.username} started screen sharing`);
+        }
+    });
+
+    socket.on('screen-share-stop', (data) => {
+        const user = users.get(socket.id);
+        if (user && user.room) {
+            user.isScreenSharing = false;
+            
+            // Notify all users in room about screen share stop
+            socket.to(user.room).emit('user-screen-share-stop', {
+                userId: user.id,
+                username: user.username
+            });
+            
+            console.log(`${user.username} stopped screen sharing`);
         }
     });
 
@@ -430,6 +603,8 @@ io.on('connection', (socket) => {
     socket.on('disconnect', () => {
         console.log(`User disconnected: ${socket.id}`);
         handleUserLeave(socket);
+        // Clean up user message history
+        userMessageHistory.delete(socket.id);
     });
 });
 
@@ -503,6 +678,7 @@ function handleUserLeave(socket, userId = null) {
         // Remove empty rooms (except for persistent rooms)
         if (room.isEmpty() && !['general', 'gaming', 'study', 'music', 'private'].includes(roomName)) {
             rooms.delete(roomName);
+            roomPasswords.delete(roomName);
             console.log(`Deleted empty room: ${roomName}`);
         }
     }
@@ -525,7 +701,8 @@ app.get('/api/rooms', (req, res) => {
     const roomStats = Array.from(rooms.entries()).map(([name, room]) => ({
         name,
         userCount: room.users.size,
-        createdAt: room.createdAt
+        createdAt: room.createdAt,
+        isPasswordProtected: room.isPasswordProtected
     }));
     
     res.json({
@@ -563,7 +740,8 @@ app.get('/api/room/:roomName', (req, res) => {
             isInCall: user.isInCall
         })),
         exists: true,
-        createdAt: room.createdAt
+        createdAt: room.createdAt,
+        isPasswordProtected: room.isPasswordProtected
     });
 });
 
@@ -603,7 +781,15 @@ setInterval(() => {
             !['general', 'gaming', 'study', 'music', 'private'].includes(roomName) &&
             Date.now() - room.createdAt.getTime() > 3600000) {
             rooms.delete(roomName);
+            roomPasswords.delete(roomName);
             cleaned++;
+        }
+    }
+    
+    // Clean up old message histories
+    for (const [socketId, history] of userMessageHistory.entries()) {
+        if (Date.now() - history.lastReset > 3600000) { // 1 hour old
+            userMessageHistory.delete(socketId);
         }
     }
     
