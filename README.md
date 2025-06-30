@@ -28,7 +28,7 @@ A real-time voice chat and screen sharing application built with Node.js, Socket
 
 1. **Clone the repository**
 ```bash
-git clone https://github.com/YOUR_USERNAME/memochat-backend.git
+git clone https://github.com/izzethannn/memochat-backend.git
 cd memochat-backend
 ```
 
@@ -158,7 +158,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## 📞 Support
 
 Having issues? 
-- Check the [Issues](https://github.com/YOUR_USERNAME/memochat-backend/issues) page
+- Check the [Issues](https://github.com/izzethannn/memochat-backend/issues) page
 - Create a new issue with details
 - Join our [Discord](https://discord.gg/your-link) for community support
 
