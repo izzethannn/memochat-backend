@@ -15,19 +15,439 @@ let createdRoomInfo = null;
 // WebRTC variables for group voice chat
 let peerConnections = {};
 let screenPeerConnections = {};
-let screenShareConnections = {}; // NEW: Separate connections for screen sharing
+let screenShareConnections = {}; // Separate connections for screen sharing
 let connectedUsers = new Set();
 let lastMessageTime = 0;
 let messageCount = 0;
 
-// STUN servers for NAT traversal
+// ENHANCED ICE SERVERS with TURN servers for better connectivity
 const ICE_SERVERS = {
     iceServers: [
+        // STUN servers
         { urls: 'stun:stun.l.google.com:19302' },
         { urls: 'stun:stun1.l.google.com:19302' },
-        { urls: 'stun:stun2.l.google.com:19302' }
-    ]
+        { urls: 'stun:stun2.l.google.com:19302' },
+        { urls: 'stun:stun3.l.google.com:19302' },
+        { urls: 'stun:stun4.l.google.com:19302' },
+        
+        // Free TURN servers for better connectivity
+        {
+            urls: 'turn:openrelay.metered.ca:80',
+            username: 'openrelayproject',
+            credential: 'openrelayproject'
+        },
+        {
+            urls: 'turn:openrelay.metered.ca:443',
+            username: 'openrelayproject',
+            credential: 'openrelayproject'
+        },
+        {
+            urls: 'turn:openrelay.metered.ca:443?transport=tcp',
+            username: 'openrelayproject',
+            credential: 'openrelayproject'
+        }
+    ],
+    iceCandidatePoolSize: 10
 };
+
+// Helper function to process queued ICE candidates
+async function processQueuedCandidates(peerConnection, senderId, isScreenShare) {
+    if (!peerConnection.pendingIceCandidates || peerConnection.pendingIceCandidates.length === 0) {
+        return;
+    }
+    
+    console.log(`📦 Processing ${peerConnection.pendingIceCandidates.length} queued ICE candidates for ${senderId}`);
+    
+    const candidates = [...peerConnection.pendingIceCandidates];
+    peerConnection.pendingIceCandidates = [];
+    
+    for (const candidate of candidates) {
+        try {
+            if (peerConnection.remoteDescription && peerConnection.signalingState !== 'closed') {
+                await peerConnection.addIceCandidate(candidate);
+                console.log(`✅ Added queued ${isScreenShare ? 'screen' : 'voice'} ICE candidate for ${senderId}`);
+            }
+        } catch (error) {
+            console.warn(`⚠️ Failed to add queued ICE candidate for ${senderId}:`, error.message);
+        }
+    }
+    
+    // Clear timeout
+    if (peerConnection.candidateTimeout) {
+        clearTimeout(peerConnection.candidateTimeout);
+        delete peerConnection.candidateTimeout;
+    }
+}
+
+// FIXED ICE Candidate Handler with proper validation and queueing
+async function handleWebRTCIceCandidate(data) {
+    try {
+        const { candidate, senderId, isScreenShare } = data;
+        
+        console.log(`🧊 Received ICE candidate from ${senderId} (${isScreenShare ? 'screen' : 'voice'})`);
+        
+        // Get the correct peer connection based on type
+        let peerConnection = null;
+        
+        if (isScreenShare) {
+            peerConnection = screenShareConnections[senderId] || screenPeerConnections[senderId];
+        } else {
+            peerConnection = peerConnections[senderId];
+        }
+        
+        if (!peerConnection) {
+            console.warn(`⚠️ No peer connection found for ICE candidate from ${senderId} (${isScreenShare ? 'screen' : 'voice'})`);
+            return;
+        }
+        
+        // CRITICAL: Check if the peer connection is in a valid state
+        if (peerConnection.signalingState === 'closed') {
+            console.warn(`⚠️ Peer connection is closed, ignoring ICE candidate from ${senderId}`);
+            return;
+        }
+        
+        // Check if remote description is set AND connection is stable
+        if (peerConnection.remoteDescription && 
+            (peerConnection.signalingState === 'stable' || peerConnection.signalingState === 'have-remote-offer')) {
+            try {
+                await peerConnection.addIceCandidate(candidate);
+                console.log(`✅ Added ${isScreenShare ? 'screen share' : 'voice'} ICE candidate from ${senderId}`);
+            } catch (error) {
+                console.warn(`⚠️ Failed to add ICE candidate from ${senderId}:`, error.message);
+                // Don't throw - this is expected during connection renegotiation
+            }
+        } else {
+            console.warn(`⚠️ Remote description not ready for ${senderId}, queuing ICE candidate`);
+            console.log(`Signaling state: ${peerConnection.signalingState}, Remote desc: ${!!peerConnection.remoteDescription}`);
+            
+            // Queue the candidate for later
+            if (!peerConnection.pendingIceCandidates) {
+                peerConnection.pendingIceCandidates = [];
+            }
+            peerConnection.pendingIceCandidates.push(candidate);
+            
+            // Set a timeout to process queued candidates if remote description takes too long
+            if (!peerConnection.candidateTimeout) {
+                peerConnection.candidateTimeout = setTimeout(() => {
+                    console.log(`⏰ Timeout processing queued candidates for ${senderId}`);
+                    processQueuedCandidates(peerConnection, senderId, isScreenShare);
+                }, 5000);
+            }
+        }
+        
+    } catch (error) {
+        console.error('❌ Error handling ICE candidate:', error);
+        // Don't throw the error to prevent crashes
+    }
+}
+
+// ENHANCED WebRTC Offer Handler with better error handling
+async function handleWebRTCOffer(data) {
+    try {
+        console.log('📥 Received WebRTC offer:', {
+            from: data.callerId,
+            callerName: data.callerName,
+            isScreenShare: data.isScreenShare
+        });
+        
+        const { offer, callerId, isScreenShare, callerName } = data;
+        
+        // Check if we already have a connection for this user and type
+        const existingConnection = isScreenShare ? 
+            (screenShareConnections[callerId] || screenPeerConnections[callerId]) : 
+            peerConnections[callerId];
+            
+        if (existingConnection) {
+            console.log(`🔄 Closing existing ${isScreenShare ? 'screen' : 'voice'} connection for ${callerName}`);
+            
+            // Clean up existing connection properly
+            existingConnection.close();
+            
+            // Clean up queued candidates and timeouts
+            if (existingConnection.pendingIceCandidates) {
+                delete existingConnection.pendingIceCandidates;
+            }
+            if (existingConnection.candidateTimeout) {
+                clearTimeout(existingConnection.candidateTimeout);
+                delete existingConnection.candidateTimeout;
+            }
+            
+            // Remove from appropriate collection
+            if (isScreenShare) {
+                delete screenShareConnections[callerId];
+                delete screenPeerConnections[callerId];
+            } else {
+                delete peerConnections[callerId];
+            }
+        }
+        
+        // Create new peer connection with enhanced configuration
+        const peerConnection = new RTCPeerConnection({
+            ...ICE_SERVERS,
+            bundlePolicy: 'balanced',
+            rtcpMuxPolicy: 'require'
+        });
+        
+        // Store in appropriate connection object
+        if (isScreenShare) {
+            screenPeerConnections[callerId] = peerConnection;
+            console.log(`📺 Created screen share receiver connection for ${callerName}`);
+        } else {
+            peerConnections[callerId] = peerConnection;
+            console.log(`🎤 Created voice connection for ${callerName}`);
+        }
+        
+        // Add local stream only if we have one and it's not screen share receive
+        if (!isScreenShare && localStream) {
+            localStream.getTracks().forEach(track => {
+                console.log(`➕ Adding local ${track.kind} track`);
+                peerConnection.addTrack(track, localStream);
+            });
+        }
+        
+        // Handle incoming stream
+        peerConnection.ontrack = (event) => {
+            console.log(`📥 Received ${isScreenShare ? 'screen' : 'voice'} track from ${callerName}`);
+            const [remoteStream] = event.streams;
+            
+            if (isScreenShare) {
+                console.log('🖥️ Displaying remote screen share');
+                addScreenShareElement(`screen-${callerId}`, `${callerName}'s Screen`, remoteStream);
+                
+                // Verify the stream has video
+                const videoTracks = remoteStream.getVideoTracks();
+                console.log(`Screen share has ${videoTracks.length} video tracks`);
+                videoTracks.forEach((track, i) => {
+                    console.log(`Video track ${i}:`, {
+                        enabled: track.enabled,
+                        readyState: track.readyState
+                    });
+                });
+            } else {
+                console.log('🔊 Setting up voice connection');
+                addVoiceElement(callerId, callerName, remoteStream, false);
+                connectedUsers.add(callerId);
+            }
+        };
+        
+        // Handle ICE candidates with queueing
+        peerConnection.onicecandidate = (event) => {
+            if (event.candidate) {
+                socket.emit('webrtc-ice-candidate', {
+                    targetUserId: callerId,
+                    candidate: event.candidate,
+                    senderId: currentUser.id,
+                    isScreenShare: isScreenShare
+                });
+            } else {
+                console.log(`✅ ICE gathering complete for ${isScreenShare ? 'screen' : 'voice'} with ${callerName}`);
+            }
+        };
+        
+        // Enhanced connection state monitoring
+        peerConnection.onconnectionstatechange = () => {
+            const state = peerConnection.connectionState;
+            console.log(`🔄 ${isScreenShare ? 'Screen' : 'Voice'} connection state with ${callerName}:`, state);
+            
+            if (state === 'failed' || state === 'closed') {
+                console.log(`💔 Connection ${state} with ${callerName}, cleaning up`);
+                cleanupPeerConnection(peerConnection, callerId, isScreenShare);
+            }
+        };
+        
+        peerConnection.oniceconnectionstatechange = () => {
+            const state = peerConnection.iceConnectionState;
+            console.log(`🧊 ICE connection state with ${callerName}:`, state);
+            
+            if (state === 'failed') {
+                console.log(`❌ ICE connection failed with ${callerName}, attempting restart`);
+                peerConnection.restartIce();
+            }
+        };
+        
+        // Set remote description and create answer
+        await peerConnection.setRemoteDescription(offer);
+        
+        // Process any queued ICE candidates after setting remote description
+        await processQueuedCandidates(peerConnection, callerId, isScreenShare);
+        
+        const answer = await peerConnection.createAnswer();
+        await peerConnection.setLocalDescription(answer);
+        
+        socket.emit('webrtc-answer', {
+            targetUserId: callerId,
+            answer: answer,
+            answererId: currentUser.id,
+            isScreenShare: isScreenShare
+        });
+        
+        console.log(`✅ ${isScreenShare ? 'Screen share' : 'Voice'} answer sent to ${callerName}`);
+        
+    } catch (error) {
+        console.error('❌ Error handling WebRTC offer:', error);
+        showToast('Connection error occurred');
+    }
+}
+
+// ENHANCED WebRTC Answer Handler
+async function handleWebRTCAnswer(data) {
+    try {
+        console.log('📥 Received WebRTC answer:', {
+            from: data.answererId,
+            answererName: data.answererName,
+            isScreenShare: data.isScreenShare
+        });
+        
+        const { answer, answererId, isScreenShare, answererName } = data;
+        
+        // Get the correct peer connection
+        const peerConnection = isScreenShare ? 
+            screenShareConnections[answererId] || screenPeerConnections[answererId] : 
+            peerConnections[answererId];
+        
+        if (peerConnection) {
+            await peerConnection.setRemoteDescription(answer);
+            
+            // Process any queued ICE candidates after setting remote description
+            await processQueuedCandidates(peerConnection, answererId, isScreenShare);
+            
+            console.log(`✅ ${isScreenShare ? 'Screen share' : 'Voice'} connection established with ${answererName}`);
+        } else {
+            console.error(`❌ No peer connection found for answer from ${answererId} (${isScreenShare ? 'screen' : 'voice'})`);
+        }
+        
+    } catch (error) {
+        console.error('❌ Error handling WebRTC answer:', error);
+    }
+}
+
+// Helper function to clean up peer connections
+function cleanupPeerConnection(peerConnection, userId, isScreenShare) {
+    try {
+        // Clear timeouts and queued candidates
+        if (peerConnection.candidateTimeout) {
+            clearTimeout(peerConnection.candidateTimeout);
+            delete peerConnection.candidateTimeout;
+        }
+        if (peerConnection.pendingIceCandidates) {
+            delete peerConnection.pendingIceCandidates;
+        }
+        
+        // Remove from UI
+        if (isScreenShare) {
+            removeScreenShareElement(`screen-${userId}`);
+        } else {
+            removeVoiceElement(userId);
+        }
+        
+        // Remove from connection objects
+        if (isScreenShare) {
+            delete screenShareConnections[userId];
+            delete screenPeerConnections[userId];
+        } else {
+            delete peerConnections[userId];
+        }
+        
+        connectedUsers.delete(userId);
+        
+    } catch (error) {
+        console.error('Error cleaning up peer connection:', error);
+    }
+}
+
+// ENHANCED Screen Share Setup with better connection handling
+async function setupScreenShareWithUser(userId) {
+    if (!screenStream) {
+        console.log('❌ No screen stream available for user:', userId);
+        return;
+    }
+
+    console.log('🔗 Setting up screen share connection with user:', userId);
+
+    try {
+        // Close any existing screen share connection
+        if (screenShareConnections[userId]) {
+            console.log('🔄 Closing existing screen share connection');
+            cleanupPeerConnection(screenShareConnections[userId], userId, true);
+        }
+        
+        // Create a completely separate peer connection for screen sharing
+        const screenPeerConnection = new RTCPeerConnection({
+            ...ICE_SERVERS,
+            bundlePolicy: 'balanced',
+            rtcpMuxPolicy: 'require'
+        });
+        
+        // Store in separate object
+        screenShareConnections[userId] = screenPeerConnection;
+
+        // Add screen stream tracks to this connection
+        screenStream.getTracks().forEach(track => {
+            console.log(`➕ Adding screen ${track.kind} track to connection with ${userId}`);
+            screenPeerConnection.addTrack(track, screenStream);
+        });
+
+        // Handle ICE candidates
+        screenPeerConnection.onicecandidate = (event) => {
+            if (event.candidate) {
+                console.log(`🧊 Sending screen share ICE candidate to ${userId}`);
+                socket.emit('webrtc-ice-candidate', {
+                    targetUserId: userId,
+                    candidate: event.candidate,
+                    senderId: currentUser.id,
+                    isScreenShare: true
+                });
+            } else {
+                console.log(`✅ ICE gathering complete for screen share with ${userId}`);
+            }
+        };
+
+        // Enhanced connection monitoring
+        screenPeerConnection.onconnectionstatechange = () => {
+            const state = screenPeerConnection.connectionState;
+            console.log(`🔄 Screen share connection state with ${userId}:`, state);
+            
+            if (state === 'failed') {
+                console.log(`❌ Screen share connection failed with ${userId}`);
+                showToast('Screen share connection failed');
+                cleanupPeerConnection(screenPeerConnection, userId, true);
+            }
+        };
+
+        screenPeerConnection.oniceconnectionstatechange = () => {
+            const state = screenPeerConnection.iceConnectionState;
+            console.log(`🧊 Screen share ICE state with ${userId}:`, state);
+            
+            if (state === 'failed') {
+                console.log(`❌ Screen share ICE failed with ${userId}, restarting`);
+                screenPeerConnection.restartIce();
+            }
+        };
+
+        // Create offer specifically for screen sharing
+        console.log(`📤 Creating screen share offer for ${userId}`);
+        const offer = await screenPeerConnection.createOffer({
+            offerToReceiveVideo: false,
+            offerToReceiveAudio: false
+        });
+        
+        await screenPeerConnection.setLocalDescription(offer);
+
+        // Send offer with screen share flag
+        socket.emit('webrtc-offer', {
+            targetUserId: userId,
+            offer: offer,
+            callerId: currentUser.id,
+            isScreenShare: true
+        });
+
+        console.log(`✅ Screen share offer sent to ${userId}`);
+
+    } catch (error) {
+        console.error(`❌ Error setting up screen share with ${userId}:`, error);
+        showToast('Failed to set up screen sharing connection');
+    }
+}
 
 // Handle room type change
 function handleRoomChange() {
@@ -199,7 +619,10 @@ async function initializeApp() {
     socket = io('https://memochat-backend-production.up.railway.app', {
         transports: ['websocket', 'polling'],
         timeout: 20000,
-        forceNew: true
+        forceNew: true,
+        reconnection: true,
+        reconnectionAttempts: 5,
+        reconnectionDelay: 1000
     });
     
     // Connection event handlers
@@ -416,24 +839,17 @@ function handleUserLeft(data) {
     
     // Clean up voice connection
     if (peerConnections[data.userId]) {
-        peerConnections[data.userId].close();
-        delete peerConnections[data.userId];
+        cleanupPeerConnection(peerConnections[data.userId], data.userId, false);
     }
     
     // Clean up screen share connections
     if (screenPeerConnections[data.userId]) {
-        screenPeerConnections[data.userId].close();
-        delete screenPeerConnections[data.userId];
+        cleanupPeerConnection(screenPeerConnections[data.userId], data.userId, true);
     }
     
     if (screenShareConnections[data.userId]) {
-        screenShareConnections[data.userId].close();
-        delete screenShareConnections[data.userId];
+        cleanupPeerConnection(screenShareConnections[data.userId], data.userId, true);
     }
-    
-    connectedUsers.delete(data.userId);
-    removeVoiceElement(data.userId);
-    removeScreenShareElement(`screen-${data.userId}`);
     
     // Remove user from list
     const userElement = document.getElementById(`user-${data.userId}`);
@@ -491,7 +907,11 @@ async function connectToUser(user) {
     try {
         console.log(`Connecting to ${user.username}...`);
         
-        const peerConnection = new RTCPeerConnection(ICE_SERVERS);
+        const peerConnection = new RTCPeerConnection({
+            ...ICE_SERVERS,
+            bundlePolicy: 'balanced',
+            rtcpMuxPolicy: 'require'
+        });
         peerConnections[user.id] = peerConnection;
         
         // Add local stream to peer connection
@@ -519,6 +939,27 @@ async function connectToUser(user) {
             }
         };
         
+        // Enhanced connection state monitoring
+        peerConnection.onconnectionstatechange = () => {
+            const state = peerConnection.connectionState;
+            console.log(`🔄 Voice connection state with ${user.username}:`, state);
+            
+            if (state === 'failed' || state === 'closed') {
+                console.log(`💔 Voice connection ${state} with ${user.username}, cleaning up`);
+                cleanupPeerConnection(peerConnection, user.id, false);
+            }
+        };
+
+        peerConnection.oniceconnectionstatechange = () => {
+            const state = peerConnection.iceConnectionState;
+            console.log(`🧊 Voice ICE connection state with ${user.username}:`, state);
+            
+            if (state === 'failed') {
+                console.log(`❌ Voice ICE connection failed with ${user.username}, attempting restart`);
+                peerConnection.restartIce();
+            }
+        };
+        
         // Create and send offer
         const offer = await peerConnection.createOffer();
         await peerConnection.setLocalDescription(offer);
@@ -535,223 +976,20 @@ async function connectToUser(user) {
     }
 }
 
-// FIXED Screen Share Functions
-async function setupScreenShareWithUser(userId) {
-    if (!screenStream) {
-        console.log('❌ No screen stream available for user:', userId);
-        return;
-    }
-
-    console.log('🔗 Setting up screen share connection with user:', userId);
-
-    try {
-        // Create a completely separate peer connection for screen sharing
-        const screenPeerConnection = new RTCPeerConnection(ICE_SERVERS);
-        
-        // Store in separate object
-        screenShareConnections[userId] = screenPeerConnection;
-
-        // Add screen stream tracks to this connection
-        screenStream.getTracks().forEach(track => {
-            console.log(`➕ Adding screen ${track.kind} track to connection with ${userId}`);
-            screenPeerConnection.addTrack(track, screenStream);
-        });
-
-        // Handle ICE candidates
-        screenPeerConnection.onicecandidate = (event) => {
-            if (event.candidate) {
-                console.log(`🧊 Sending screen share ICE candidate to ${userId}`);
-                socket.emit('webrtc-ice-candidate', {
-                    targetUserId: userId,
-                    candidate: event.candidate,
-                    senderId: currentUser.id,
-                    isScreenShare: true // Important: mark as screen share
-                });
-            }
-        };
-
-        // Monitor connection state
-        screenPeerConnection.onconnectionstatechange = () => {
-            console.log(`🔄 Screen share connection state with ${userId}:`, screenPeerConnection.connectionState);
-        };
-
-        // Create offer specifically for screen sharing
-        console.log(`📤 Creating screen share offer for ${userId}`);
-        const offer = await screenPeerConnection.createOffer({
-            offerToReceiveVideo: false, // We're only sending, not receiving
-            offerToReceiveAudio: false
-        });
-        
-        await screenPeerConnection.setLocalDescription(offer);
-
-        // Send offer with screen share flag
-        socket.emit('webrtc-offer', {
-            targetUserId: userId,
-            offer: offer,
-            callerId: currentUser.id,
-            isScreenShare: true // Critical: this tells the receiver it's screen share
-        });
-
-        console.log(`✅ Screen share offer sent to ${userId}`);
-
-    } catch (error) {
-        console.error(`❌ Error setting up screen share with ${userId}:`, error);
-    }
-}
-
-// FIXED WebRTC Signal Handlers
-async function handleWebRTCOffer(data) {
-    try {
-        console.log('📥 Received WebRTC offer:', {
-            from: data.callerId,
-            callerName: data.callerName,
-            isScreenShare: data.isScreenShare
-        });
-        
-        const { offer, callerId, isScreenShare, callerName } = data;
-        
-        // Use different connection objects for voice vs screen share
-        let peerConnection;
-        
-        if (isScreenShare) {
-            // Create new connection for receiving screen share
-            peerConnection = new RTCPeerConnection(ICE_SERVERS);
-            screenPeerConnections[callerId] = peerConnection;
-            console.log(`📺 Created screen share receiver connection for ${callerName}`);
-        } else {
-            // Regular voice connection
-            peerConnection = new RTCPeerConnection(ICE_SERVERS);
-            peerConnections[callerId] = peerConnection;
-            console.log(`🎤 Created voice connection for ${callerName}`);
-        }
-        
-        // Add local stream only if we have one and it's not screen share
-        if (!isScreenShare && localStream) {
-            localStream.getTracks().forEach(track => {
-                console.log(`➕ Adding local ${track.kind} track`);
-                peerConnection.addTrack(track, localStream);
-            });
-        }
-        
-        // Handle incoming stream
-        peerConnection.ontrack = (event) => {
-            console.log(`📥 Received ${isScreenShare ? 'screen' : 'voice'} track from ${callerName}`);
-            const [remoteStream] = event.streams;
-            
-            if (isScreenShare) {
-                console.log('🖥️ Displaying remote screen share');
-                addScreenShareElement(`screen-${callerId}`, `${callerName}'s Screen`, remoteStream);
-                
-                // Verify the stream has video
-                const videoTracks = remoteStream.getVideoTracks();
-                console.log(`Screen share has ${videoTracks.length} video tracks`);
-            } else {
-                console.log('🔊 Setting up voice connection');
-                addVoiceElement(callerId, callerName, remoteStream, false);
-                connectedUsers.add(callerId);
-            }
-        };
-        
-        // Handle ICE candidates
-        peerConnection.onicecandidate = (event) => {
-            if (event.candidate) {
-                socket.emit('webrtc-ice-candidate', {
-                    targetUserId: callerId,
-                    candidate: event.candidate,
-                    senderId: currentUser.id,
-                    isScreenShare: isScreenShare
-                });
-            }
-        };
-        
-        // Set remote description and create answer
-        await peerConnection.setRemoteDescription(offer);
-        const answer = await peerConnection.createAnswer();
-        await peerConnection.setLocalDescription(answer);
-        
-        socket.emit('webrtc-answer', {
-            targetUserId: callerId,
-            answer: answer,
-            answererId: currentUser.id,
-            isScreenShare: isScreenShare
-        });
-        
-        console.log(`✅ ${isScreenShare ? 'Screen share' : 'Voice'} answer sent to ${callerName}`);
-        
-    } catch (error) {
-        console.error('❌ Error handling WebRTC offer:', error);
-    }
-}
-
-async function handleWebRTCAnswer(data) {
-    try {
-        console.log('📥 Received WebRTC answer:', {
-            from: data.answererId,
-            answererName: data.answererName,
-            isScreenShare: data.isScreenShare
-        });
-        
-        const { answer, answererId, isScreenShare, answererName } = data;
-        
-        // Get the correct peer connection
-        const peerConnection = isScreenShare ? 
-            screenShareConnections[answererId] || screenPeerConnections[answererId] : 
-            peerConnections[answererId];
-        
-        if (peerConnection) {
-            await peerConnection.setRemoteDescription(answer);
-            console.log(`✅ ${isScreenShare ? 'Screen share' : 'Voice'} connection established with ${answererName}`);
-        } else {
-            console.error(`❌ No peer connection found for ${answererId} (${isScreenShare ? 'screen' : 'voice'})`);
-        }
-        
-    } catch (error) {
-        console.error('❌ Error handling WebRTC answer:', error);
-    }
-}
-
-async function handleWebRTCIceCandidate(data) {
-    try {
-        const { candidate, senderId, isScreenShare } = data;
-        
-        // Get the correct peer connection based on type
-        const peerConnection = isScreenShare ? 
-            (screenShareConnections[senderId] || screenPeerConnections[senderId]) : 
-            peerConnections[senderId];
-        
-        if (peerConnection) {
-            await peerConnection.addIceCandidate(candidate);
-            console.log(`✅ Added ${isScreenShare ? 'screen share' : 'voice'} ICE candidate from ${senderId}`);
-        } else {
-            console.warn(`⚠️ No peer connection found for ICE candidate from ${senderId} (${isScreenShare ? 'screen' : 'voice'})`);
-        }
-        
-    } catch (error) {
-        console.error('❌ Error handling ICE candidate:', error);
-    }
-}
-
 function handleUserDisconnected(data) {
     const { userId } = data;
     
     if (peerConnections[userId]) {
-        peerConnections[userId].close();
-        delete peerConnections[userId];
+        cleanupPeerConnection(peerConnections[userId], userId, false);
     }
     
     if (screenPeerConnections[userId]) {
-        screenPeerConnections[userId].close();
-        delete screenPeerConnections[userId];
+        cleanupPeerConnection(screenPeerConnections[userId], userId, true);
     }
     
     if (screenShareConnections[userId]) {
-        screenShareConnections[userId].close();
-        delete screenShareConnections[userId];
+        cleanupPeerConnection(screenShareConnections[userId], userId, true);
     }
-    
-    connectedUsers.delete(userId);
-    removeVoiceElement(userId);
-    removeScreenShareElement(`screen-${userId}`);
 }
 
 function findUserById(userId) {
@@ -763,21 +1001,36 @@ function findUserById(userId) {
     return null;
 }
 
+// ENHANCED cleanup function
 function cleanupVoiceChat() {
+    console.log('🧹 Cleaning up all connections...');
+    
     // Close all peer connections
     Object.keys(peerConnections).forEach(userId => {
-        peerConnections[userId].close();
-        removeVoiceElement(userId);
+        console.log(`🔌 Closing voice connection with ${userId}`);
+        try {
+            cleanupPeerConnection(peerConnections[userId], userId, false);
+        } catch (error) {
+            console.warn('Error closing voice connection:', error);
+        }
     });
     
     Object.keys(screenPeerConnections).forEach(userId => {
-        screenPeerConnections[userId].close();
-        removeScreenShareElement(`screen-${userId}`);
+        console.log(`🔌 Closing screen peer connection with ${userId}`);
+        try {
+            cleanupPeerConnection(screenPeerConnections[userId], userId, true);
+        } catch (error) {
+            console.warn('Error closing screen peer connection:', error);
+        }
     });
     
     Object.keys(screenShareConnections).forEach(userId => {
-        screenShareConnections[userId].close();
-        removeScreenShareElement(`screen-${userId}`);
+        console.log(`🔌 Closing screen share connection with ${userId}`);
+        try {
+            cleanupPeerConnection(screenShareConnections[userId], userId, true);
+        } catch (error) {
+            console.warn('Error closing screen share connection:', error);
+        }
     });
     
     peerConnections = {};
@@ -785,6 +1038,8 @@ function cleanupVoiceChat() {
     screenShareConnections = {};
     connectedUsers.clear();
     isInVoiceChat = false;
+    
+    console.log('✅ Connection cleanup complete');
 }
 
 // UI Control Functions
@@ -915,14 +1170,12 @@ function stopScreenShare() {
     // Close all screen share connections
     Object.keys(screenShareConnections).forEach(userId => {
         console.log(`🔌 Closing screen share connection with ${userId}`);
-        screenShareConnections[userId].close();
-        delete screenShareConnections[userId];
+        cleanupPeerConnection(screenShareConnections[userId], userId, true);
     });
     
     Object.keys(screenPeerConnections).forEach(userId => {
         console.log(`🔌 Closing screen peer connection with ${userId}`);
-        screenPeerConnections[userId].close();
-        delete screenPeerConnections[userId];
+        cleanupPeerConnection(screenPeerConnections[userId], userId, true);
     });
     
     // Remove UI elements
@@ -1369,13 +1622,30 @@ function clearVideoGrid() {
 
 // Debug function to check connections
 function debugConnections() {
-    console.log('=== CONNECTION DEBUG ===');
+    console.log('=== ENHANCED CONNECTION DEBUG ===');
     console.log('Voice connections:', Object.keys(peerConnections));
     console.log('Screen share connections (new):', Object.keys(screenShareConnections));
     console.log('Screen peer connections (old):', Object.keys(screenPeerConnections));
     console.log('Connected users:', Array.from(connectedUsers));
     console.log('Is screen sharing:', isScreenSharing);
     console.log('Screen stream:', screenStream);
+    
+    // Check connection states
+    Object.entries(peerConnections).forEach(([userId, pc]) => {
+        console.log(`Voice connection ${userId}:`, {
+            connectionState: pc.connectionState,
+            iceConnectionState: pc.iceConnectionState,
+            signalingState: pc.signalingState
+        });
+    });
+    
+    Object.entries(screenShareConnections).forEach(([userId, pc]) => {
+        console.log(`Screen connection ${userId}:`, {
+            connectionState: pc.connectionState,
+            iceConnectionState: pc.iceConnectionState,
+            signalingState: pc.signalingState
+        });
+    });
     
     if (screenStream) {
         console.log('Screen stream tracks:');
@@ -1390,8 +1660,33 @@ function debugConnections() {
     }
 }
 
+// Connection health monitoring
+function startConnectionHealthMonitoring() {
+    setInterval(() => {
+        const allConnections = [
+            ...Object.values(peerConnections),
+            ...Object.values(screenShareConnections),
+            ...Object.values(screenPeerConnections)
+        ];
+        
+        allConnections.forEach((pc, index) => {
+            if (pc.connectionState === 'failed') {
+                console.warn(`🚨 Connection ${index} is in failed state, attempting restart`);
+                try {
+                    pc.restartIce();
+                } catch (error) {
+                    console.error('Failed to restart ICE:', error);
+                }
+            }
+        });
+    }, 30000); // Check every 30 seconds
+}
+
 // Event Listeners
-document.addEventListener('DOMContentLoaded', initializeApp);
+document.addEventListener('DOMContentLoaded', () => {
+    initializeApp();
+    startConnectionHealthMonitoring();
+});
 
 // Handle enter key in inputs
 document.getElementById('usernameInput').addEventListener('keypress', function(e) {
