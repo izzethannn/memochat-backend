@@ -25,7 +25,6 @@
             height: 100vh;
         }
 
-        /* Mobile-first responsive design */
         .sidebar {
             width: 100%;
             background: rgba(0, 0, 0, 0.3);
@@ -48,7 +47,6 @@
             display: flex;
         }
 
-        /* Desktop styles */
         @media (min-width: 768px) {
             .sidebar {
                 width: 300px;
@@ -59,10 +57,6 @@
                 display: flex;
                 padding: 20px;
             }
-            
-            .main-content.active {
-                display: flex;
-            }
         }
 
         .content-area {
@@ -72,7 +66,6 @@
             gap: 15px;
         }
 
-        /* Mobile: Stack video and chat vertically */
         @media (min-width: 768px) {
             .content-area {
                 flex-direction: row;
@@ -310,7 +303,6 @@
             background: rgba(255, 255, 255, 0.1);
             border-radius: 8px;
             transition: all 0.3s ease;
-            cursor: pointer;
             position: relative;
         }
 
@@ -484,8 +476,7 @@
             font-size: 13px;
         }
 
-        .call-controls {
-            display: none;
+        .voice-controls {
             background: rgba(0, 0, 0, 0.3);
             padding: 12px;
             border-radius: 10px;
@@ -493,62 +484,11 @@
             text-align: center;
         }
 
-        .call-controls.active {
-            display: block;
+        .voice-controls h4 {
+            margin-bottom: 8px;
+            color: #43b581;
         }
 
-        .call-modal {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.8);
-            display: none;
-            align-items: center;
-            justify-content: center;
-            z-index: 1000;
-            padding: 20px;
-        }
-
-        .call-modal.active {
-            display: flex;
-        }
-
-        .call-modal-content {
-            background: rgba(0, 0, 0, 0.9);
-            padding: 20px;
-            border-radius: 15px;
-            text-align: center;
-            max-width: 350px;
-            width: 100%;
-        }
-
-        .call-button {
-            background: #43b581;
-            border: none;
-            padding: 8px 12px;
-            border-radius: 6px;
-            color: white;
-            cursor: pointer;
-            font-size: 12px;
-            margin: 0 5px;
-            min-width: 70px;
-        }
-
-        .call-button:hover {
-            background: #369968;
-        }
-
-        .call-button.danger {
-            background: #f04747;
-        }
-
-        .call-button.danger:hover {
-            background: #d73c3c;
-        }
-
-        /* Mobile navigation */
         .mobile-nav {
             display: none;
             position: fixed;
@@ -581,7 +521,6 @@
             background: #5b6eae;
         }
 
-        /* Hide sidebar on mobile when in main content */
         @media (max-width: 767px) {
             .sidebar.hidden {
                 display: none;
@@ -611,24 +550,6 @@
         .toast.show {
             opacity: 1;
         }
-
-        .call-btn {
-            position: absolute;
-            right: 10px;
-            top: 50%;
-            transform: translateY(-50%);
-            background: #43b581;
-            border: none;
-            padding: 4px 8px;
-            border-radius: 4px;
-            color: white;
-            cursor: pointer;
-            font-size: 10px;
-        }
-
-        .call-btn:hover {
-            background: #369968;
-        }
     </style>
 </head>
 <body>
@@ -652,10 +573,10 @@
                 <button class="btn btn-primary" onclick="joinRoom()" style="width: 100%;">Join Voice Chat</button>
             </div>
 
-            <div class="call-controls" id="callControls">
-                <h4>🎤 Voice Call Active</h4>
-                <p id="callStatus">Connected</p>
-                <button class="btn btn-danger" onclick="endCall()" style="margin-top: 10px;">End Call</button>
+            <div class="voice-controls" id="voiceControls" style="display: none;">
+                <h4>🎤 Group Voice Chat</h4>
+                <p id="voiceStatus">Connected to voice channel</p>
+                <p style="font-size: 11px; opacity: 0.7; margin-top: 5px;">Everyone can hear each other</p>
             </div>
 
             <div class="users-list" id="usersList">
@@ -689,8 +610,8 @@
                     <div class="video-grid" id="videoGrid">
                         <div style="display: flex; align-items: center; justify-content: center; height: 200px; opacity: 0.6;">
                             <div style="text-align: center;">
-                                <h3 style="font-size: 16px; margin-bottom: 10px;">🎙️ Voice Chat Ready</h3>
-                                <p style="font-size: 13px;">Click on a user to start voice chat</p>
+                                <h3 style="font-size: 16px; margin-bottom: 10px;">🎙️ Group Voice Chat</h3>
+                                <p style="font-size: 13px;">Everyone in the room can hear each other</p>
                             </div>
                         </div>
                     </div>
@@ -716,10 +637,10 @@
             <div class="video-grid" id="welcomeScreen">
                 <div style="display: flex; align-items: center; justify-content: center; height: 250px; opacity: 0.6;">
                     <div style="text-align: center;">
-                        <h3 style="font-size: 18px; margin-bottom: 10px;">🎙️ Voice Chat Ready</h3>
+                        <h3 style="font-size: 18px; margin-bottom: 10px;">🎙️ Group Voice Chat Ready</h3>
                         <p style="font-size: 14px;">Join a room to start talking with friends</p>
                         <p style="margin-top: 15px; font-size: 13px; opacity: 0.8;">
-                            ✨ Features: Voice chat, Screen sharing, Text chat
+                            ✨ Features: Group voice chat, Screen sharing, Text chat
                         </p>
                     </div>
                 </div>
@@ -732,18 +653,6 @@
         <button class="mobile-nav-btn" onclick="toggleMobileView()">
             <span id="mobileNavText">Show Chat</span>
         </button>
-    </div>
-
-    <!-- Call Modal -->
-    <div class="call-modal" id="callModal">
-        <div class="call-modal-content">
-            <h3 id="callModalTitle">Incoming Call</h3>
-            <p id="callModalMessage">User is calling you...</p>
-            <div style="margin-top: 20px;">
-                <button class="call-button" onclick="acceptCall()">Accept</button>
-                <button class="call-button danger" onclick="rejectCall()">Reject</button>
-            </div>
-        </div>
     </div>
 
     <!-- Toast for notifications -->
@@ -762,11 +671,11 @@
         let isMuted = false;
         let isScreenSharing = false;
         let isMobileView = false;
+        let isInVoiceChat = false;
         
-        // WebRTC variables
+        // WebRTC variables for group voice chat
         let peerConnections = {};
-        let currentCall = null;
-        let incomingCall = null;
+        let connectedUsers = new Set();
         
         // STUN servers for NAT traversal
         const ICE_SERVERS = {
@@ -827,7 +736,7 @@
             socket.on('disconnect', () => {
                 console.log('Disconnected from server');
                 updateConnectionStatus('disconnected');
-                endAllCalls();
+                cleanupVoiceChat();
                 showToast('Disconnected from server');
             });
 
@@ -844,13 +753,10 @@
             socket.on('chat-message', handleChatMessage);
             socket.on('user-status-update', handleUserStatusUpdate);
             
-            // WebRTC signaling handlers
+            // WebRTC signaling handlers for group voice
             socket.on('webrtc-offer', handleWebRTCOffer);
             socket.on('webrtc-answer', handleWebRTCAnswer);
             socket.on('webrtc-ice-candidate', handleWebRTCIceCandidate);
-            socket.on('incoming-call', handleIncomingCall);
-            socket.on('call-response', handleCallResponse);
-            socket.on('call-ended', handleCallEnded);
             socket.on('user-disconnected', handleUserDisconnected);
             
             // Error handling
@@ -879,7 +785,7 @@
             try {
                 updateConnectionStatus('connecting');
                 
-                // Get user media for voice chat
+                // Get user media for group voice chat
                 localStream = await navigator.mediaDevices.getUserMedia({ 
                     audio: {
                         echoCancellation: true,
@@ -931,13 +837,14 @@
                 });
             }
             
-            // Add video element for self
-            addVideoElement('local', 'You (Audio Only)', null, true);
+            // Start group voice chat
+            startGroupVoiceChat(data.users);
             
             // Update UI
             document.getElementById('joinForm').style.display = 'none';
             document.getElementById('welcomeScreen').style.display = 'none';
             document.getElementById('contentArea').style.display = 'flex';
+            document.getElementById('voiceControls').style.display = 'block';
             document.getElementById('micBtn').disabled = false;
             document.getElementById('screenBtn').disabled = false;
             document.getElementById('leaveBtn').disabled = false;
@@ -952,81 +859,33 @@
 
             playNotificationSound('join');
             updateConnectionStatus('connected');
-            showToast('Joined room successfully!');
+            showToast('Joined voice channel!');
         }
 
-        function handleUserJoined(data) {
-            console.log('User joined:', data);
-            addChatMessage('System', `${data.username} joined the room`, true);
-            playNotificationSound('join');
-            showToast(`${data.username} joined`);
-        }
-
-        function handleUserLeft(data) {
-            console.log('User left:', data);
+        async function startGroupVoiceChat(users) {
+            if (!localStream) return;
             
-            // Clean up any call connections
-            if (peerConnections[data.userId]) {
-                peerConnections[data.userId].close();
-                delete peerConnections[data.userId];
-            }
-            removeAudioElement(data.userId);
-            removeVideoElement(data.userId);
+            isInVoiceChat = true;
             
-            // End call if it was with this user
-            if (currentCall && currentCall.userId === data.userId) {
-                currentCall = null;
-                hideCallControls();
-                showToast(`Call ended - ${data.username} left`);
-            }
+            // Add yourself to the voice chat
+            addVoiceElement('local', 'You', null, true);
             
-            addChatMessage('System', `${data.username} left the room`, true);
-            playNotificationSound('leave');
-            showToast(`${data.username} left`);
-        }
-
-        function handleUserStatusUpdate(data) {
-            const { userId, username, isMuted, isScreenSharing, isInCall } = data;
-            console.log(`${username} status: muted=${isMuted}, sharing=${isScreenSharing}, inCall=${isInCall}`);
-            updateUserStatus(userId, { isMuted, isScreenSharing, isInCall });
-        }
-
-        function updateUserStatus(userId, status) {
-            const usersList = document.getElementById('usersList');
-            const userItems = usersList.querySelectorAll('.user-item');
-            
-            userItems.forEach(item => {
-                const userData = item.dataset.userId;
-                if (userData === userId) {
-                    const statusIndicator = item.querySelector('.status-indicator');
-                    const userStatus = item.querySelector('.user-status');
-                    
-                    if (status.isInCall) {
-                        statusIndicator.className = 'status-indicator status-in-call';
-                        userStatus.textContent = 'In voice call';
-                    } else if (status.isMuted) {
-                        statusIndicator.className = 'status-indicator status-muted';
-                        userStatus.textContent = 'Muted';
-                    } else if (status.isScreenSharing) {
-                        statusIndicator.className = 'status-indicator status-speaking';
-                        userStatus.textContent = 'Sharing screen';
-                    } else {
-                        statusIndicator.className = 'status-indicator status-online';
-                        userStatus.textContent = 'Voice connected';
-                    }
+            // Connect to all other users in the room
+            for (const user of users) {
+                if (user.id !== currentUser.id) {
+                    await connectToUser(user);
                 }
-            });
+            }
         }
 
-        // WebRTC Functions
-        async function callUser(targetUserId, targetName) {
+        async function connectToUser(user) {
+            if (peerConnections[user.id]) return; // Already connected
+            
             try {
-                console.log(`Calling ${targetName}...`);
-                showToast(`Calling ${targetName}...`);
+                console.log(`Connecting to ${user.username}...`);
                 
-                // Create peer connection
                 const peerConnection = new RTCPeerConnection(ICE_SERVERS);
-                peerConnections[targetUserId] = peerConnection;
+                peerConnections[user.id] = peerConnection;
                 
                 // Add local stream to peer connection
                 localStream.getTracks().forEach(track => {
@@ -1036,14 +895,16 @@
                 // Handle incoming stream
                 peerConnection.ontrack = (event) => {
                     const [remoteStream] = event.streams;
-                    addAudioElement(targetUserId, targetName, remoteStream);
+                    addVoiceElement(user.id, user.username, remoteStream, false);
+                    connectedUsers.add(user.id);
+                    console.log(`Now hearing ${user.username}`);
                 };
                 
                 // Handle ICE candidates
                 peerConnection.onicecandidate = (event) => {
                     if (event.candidate) {
                         socket.emit('webrtc-ice-candidate', {
-                            targetUserId: targetUserId,
+                            targetUserId: user.id,
                             candidate: event.candidate,
                             senderId: currentUser.id
                         });
@@ -1055,25 +916,113 @@
                 await peerConnection.setLocalDescription(offer);
                 
                 socket.emit('webrtc-offer', {
-                    targetUserId: targetUserId,
+                    targetUserId: user.id,
                     offer: offer,
                     callerId: currentUser.id
                 });
                 
-                currentCall = { userId: targetUserId, userName: targetName };
-                showCallControls(targetName, 'Calling...');
-                
             } catch (error) {
-                console.error('Error calling user:', error);
-                showToast('Could not start call. Please try again.');
+                console.error(`Error connecting to ${user.username}:`, error);
+            }
+        }
+
+        function handleUserJoined(data) {
+            console.log('User joined:', data);
+            addChatMessage('System', `${data.username} joined the room`, true);
+            playNotificationSound('join');
+            showToast(`${data.username} joined`);
+            
+            // Update user count in subtitle
+            const currentCount = document.getElementById('roomSubtitle').textContent;
+            const newCount = parseInt(currentCount.match(/\d+/)[0]) + 1;
+            document.getElementById('roomSubtitle').textContent = `${newCount} user(s) connected`;
+            
+            // Add user to the list
+            addUserToList(data);
+            
+            // Connect to new user for voice chat
+            if (isInVoiceChat) {
+                connectToUser(data);
+            }
+        }
+
+        function addUserToList(userData) {
+            const usersList = document.getElementById('usersList');
+            
+            const userItem = document.createElement('div');
+            userItem.className = 'user-item';
+            userItem.dataset.userId = userData.userId;
+            userItem.id = `user-${userData.userId}`;
+            
+            userItem.innerHTML = `
+                <div class="user-avatar">${userData.username[0].toUpperCase()}</div>
+                <div class="user-info">
+                    <div class="user-name">${userData.username}</div>
+                    <div class="user-status">Voice connected</div>
+                </div>
+                <div class="status-indicator status-online"></div>
+            `;
+            
+            usersList.appendChild(userItem);
+        }
+
+        function handleUserLeft(data) {
+            console.log('User left:', data);
+            
+            // Clean up voice connection
+            if (peerConnections[data.userId]) {
+                peerConnections[data.userId].close();
+                delete peerConnections[data.userId];
+            }
+            connectedUsers.delete(data.userId);
+            removeVoiceElement(data.userId);
+            
+            // Remove user from list
+            const userElement = document.getElementById(`user-${data.userId}`);
+            if (userElement) {
+                userElement.remove();
+            }
+            
+            // Update user count
+            const currentCount = document.getElementById('roomSubtitle').textContent;
+            const newCount = Math.max(1, parseInt(currentCount.match(/\d+/)[0]) - 1);
+            document.getElementById('roomSubtitle').textContent = `${newCount} user(s) connected`;
+            
+            addChatMessage('System', `${data.username} left the room`, true);
+            playNotificationSound('leave');
+            showToast(`${data.username} left`);
+        }
+
+        function handleUserStatusUpdate(data) {
+            const { userId, username, isMuted, isScreenSharing, isInCall } = data;
+            console.log(`${username} status: muted=${isMuted}, sharing=${isScreenSharing}`);
+            updateUserStatus(userId, { isMuted, isScreenSharing, isInCall });
+        }
+
+        function updateUserStatus(userId, status) {
+            const userElement = document.getElementById(`user-${userId}`);
+            if (!userElement) return;
+            
+            const statusIndicator = userElement.querySelector('.status-indicator');
+            const userStatus = userElement.querySelector('.user-status');
+            
+            if (status.isMuted) {
+                statusIndicator.className = 'status-indicator status-muted';
+                userStatus.textContent = 'Muted';
+            } else if (status.isScreenSharing) {
+                statusIndicator.className = 'status-indicator status-speaking';
+                userStatus.textContent = 'Sharing screen';
+            } else {
+                statusIndicator.className = 'status-indicator status-online';
+                userStatus.textContent = 'Voice connected';
             }
         }
 
         async function handleWebRTCOffer(data) {
             try {
-                console.log('Received WebRTC offer from:', data.callerName);
+                console.log('Received WebRTC offer from:', data.callerId);
                 
-                const { offer, callerId, callerName } = data;
+                const { offer, callerId } = data;
                 
                 // Create peer connection
                 const peerConnection = new RTCPeerConnection(ICE_SERVERS);
@@ -1087,7 +1036,12 @@
                 // Handle incoming stream
                 peerConnection.ontrack = (event) => {
                     const [remoteStream] = event.streams;
-                    addAudioElement(callerId, callerName, remoteStream);
+                    const user = findUserById(callerId);
+                    if (user) {
+                        addVoiceElement(callerId, user.username, remoteStream, false);
+                        connectedUsers.add(callerId);
+                        console.log(`Now hearing ${user.username}`);
+                    }
                 };
                 
                 // Handle ICE candidates
@@ -1112,34 +1066,25 @@
                     answererId: currentUser.id
                 });
                 
-                currentCall = { userId: callerId, userName: callerName };
-                showCallControls(callerName, 'Connected');
-                playNotificationSound('call_connected');
-                showToast(`Connected to ${callerName}`);
-                
             } catch (error) {
                 console.error('Error handling WebRTC offer:', error);
-                showToast('Failed to connect call');
             }
         }
 
         async function handleWebRTCAnswer(data) {
             try {
-                console.log('Received WebRTC answer from:', data.answererName);
+                console.log('Received WebRTC answer from:', data.answererId);
                 
-                const { answer, answererId, answererName } = data;
+                const { answer, answererId } = data;
                 const peerConnection = peerConnections[answererId];
                 
                 if (peerConnection) {
                     await peerConnection.setRemoteDescription(answer);
-                    showCallControls(answererName, 'Connected');
-                    playNotificationSound('call_connected');
-                    showToast(`Connected to ${answererName}`);
+                    console.log(`Connected to ${answererId}`);
                 }
                 
             } catch (error) {
                 console.error('Error handling WebRTC answer:', error);
-                showToast('Failed to connect call');
             }
         }
 
@@ -1157,46 +1102,6 @@
             }
         }
 
-        function handleIncomingCall(data) {
-            const { callerId, callerName } = data;
-            
-            incomingCall = { callerId, callerName };
-            
-            document.getElementById('callModalTitle').textContent = 'Incoming Call';
-            document.getElementById('callModalMessage').textContent = `${callerName} is calling you...`;
-            document.getElementById('callModal').classList.add('active');
-            
-            playNotificationSound('incoming_call');
-        }
-
-        function handleCallResponse(data) {
-            const { targetId, targetName, accepted } = data;
-            
-            if (accepted) {
-                showToast(`${targetName} accepted your call`);
-                // The WebRTC connection will be established through offer/answer
-            } else {
-                showToast(`${targetName} declined your call`);
-                currentCall = null;
-                hideCallControls();
-            }
-        }
-
-        function handleCallEnded(data) {
-            const { userId, userName } = data;
-            
-            if (peerConnections[userId]) {
-                peerConnections[userId].close();
-                delete peerConnections[userId];
-            }
-            
-            removeAudioElement(userId);
-            currentCall = null;
-            hideCallControls();
-            showToast(`Call ended with ${userName}`);
-            playNotificationSound('call_ended');
-        }
-
         function handleUserDisconnected(data) {
             const { userId } = data;
             
@@ -1205,103 +1110,82 @@
                 delete peerConnections[userId];
             }
             
-            removeAudioElement(userId);
-            
-            if (currentCall && currentCall.userId === userId) {
-                currentCall = null;
-                hideCallControls();
-                showToast('Call ended - user disconnected');
+            connectedUsers.delete(userId);
+            removeVoiceElement(userId);
+        }
+
+        function findUserById(userId) {
+            const userElement = document.getElementById(`user-${userId}`);
+            if (userElement) {
+                const userName = userElement.querySelector('.user-name').textContent;
+                return { id: userId, username: userName };
             }
+            return null;
         }
 
-        function acceptCall() {
-            if (!incomingCall) return;
+        function addVoiceElement(userId, userName, stream, isLocal = false) {
+            const videoGrid = document.getElementById('videoGrid');
             
-            const { callerId, callerName } = incomingCall;
-            
-            socket.emit('call-response', {
-                callerId: callerId,
-                accepted: true
-            });
-            
-            document.getElementById('callModal').classList.remove('active');
-            incomingCall = null;
+            // Clear welcome message if this is the first user
+            const welcomeMsg = videoGrid.querySelector('[style*="display: flex"]');
+            if (welcomeMsg && welcomeMsg.style.display !== 'none') {
+                welcomeMsg.style.display = 'none';
+            }
+
+            // Remove existing element if any
+            removeVoiceElement(userId);
+
+            const container = document.createElement('div');
+            container.className = 'video-container';
+            container.id = `voice-${userId}`;
+
+            if (isLocal || !stream) {
+                // Audio-only visualization
+                container.innerHTML = `
+                    <div class="video-element" style="display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #667eea, #764ba2);">
+                        <div style="text-align: center;">
+                            <div style="font-size: 32px; margin-bottom: 8px;">${isLocal ? '🎤' : '🔊'}</div>
+                            <div style="font-weight: 600; font-size: 14px;">${userName}</div>
+                            <div style="font-size: 11px; opacity: 0.8; margin-top: 4px;">${isLocal ? 'You' : 'Speaking'}</div>
+                        </div>
+                    </div>
+                    <div class="video-label">${userName}</div>
+                `;
+            } else {
+                // Create hidden audio element for remote stream
+                const audioElement = document.createElement('audio');
+                audioElement.id = `audio-${userId}`;
+                audioElement.srcObject = stream;
+                audioElement.autoplay = true;
+                audioElement.style.display = 'none';
+                document.body.appendChild(audioElement);
+
+                // Visual representation
+                container.innerHTML = `
+                    <div class="video-element" style="display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #43b581, #369968);">
+                        <div style="text-align: center;">
+                            <div style="font-size: 32px; margin-bottom: 8px;">🔊</div>
+                            <div style="font-weight: 600; font-size: 14px;">${userName}</div>
+                            <div style="font-size: 11px; opacity: 0.8; margin-top: 4px;">Connected</div>
+                        </div>
+                    </div>
+                    <div class="video-label">${userName}</div>
+                `;
+            }
+
+            videoGrid.appendChild(container);
         }
 
-        function rejectCall() {
-            if (!incomingCall) return;
-            
-            const { callerId } = incomingCall;
-            
-            socket.emit('call-response', {
-                callerId: callerId,
-                accepted: false
-            });
-            
-            document.getElementById('callModal').classList.remove('active');
-            incomingCall = null;
-        }
-
-        function endCall() {
-            if (!currentCall) return;
-            
-            socket.emit('end-call', {
-                targetUserId: currentCall.userId
-            });
-            
-            // Clean up local peer connection
-            if (peerConnections[currentCall.userId]) {
-                peerConnections[currentCall.userId].close();
-                delete peerConnections[currentCall.userId];
+        function removeVoiceElement(userId) {
+            const voiceElement = document.getElementById(`voice-${userId}`);
+            if (voiceElement) {
+                voiceElement.remove();
             }
             
-            removeAudioElement(currentCall.userId);
-            currentCall = null;
-            hideCallControls();
-            showToast('Call ended');
-            playNotificationSound('call_ended');
-        }
-
-        function endAllCalls() {
-            Object.keys(peerConnections).forEach(userId => {
-                peerConnections[userId].close();
-                removeAudioElement(userId);
-            });
-            peerConnections = {};
-            currentCall = null;
-            hideCallControls();
-        }
-
-        function showCallControls(userName, status) {
-            document.getElementById('callControls').classList.add('active');
-            document.getElementById('callStatus').textContent = `${status} with ${userName}`;
-        }
-
-        function hideCallControls() {
-            document.getElementById('callControls').classList.remove('active');
-        }
-
-        function addAudioElement(userId, userName, stream) {
-            // Remove existing audio element if any
-            removeAudioElement(userId);
-            
-            const audioElement = document.createElement('audio');
-            audioElement.id = `audio-${userId}`;
-            audioElement.srcObject = stream;
-            audioElement.autoplay = true;
-            audioElement.style.display = 'none';
-            document.body.appendChild(audioElement);
-            
-            // Add visual indicator in video grid
-            addVideoElement(`call-${userId}`, `🎤 ${userName} (Voice)`, null, true);
-        }
-
-        function removeAudioElement(userId) {
             const audioElement = document.getElementById(`audio-${userId}`);
             if (audioElement) {
                 audioElement.remove();
             }
-            removeVideoElement(`call-${userId}`);
         }
 
         function toggleMic() {
@@ -1343,7 +1227,7 @@
                         audio: true 
                     });
                     
-                    addVideoElement('screen', 'Your Screen Share', screenStream);
+                    addScreenShareElement('screen', 'Your Screen Share', screenStream);
                     
                     document.getElementById('screenBtn').textContent = '⏹️ Stop';
                     document.getElementById('screenBtn').className = 'btn btn-danger';
@@ -1372,13 +1256,36 @@
             }
         }
 
+        function addScreenShareElement(id, label, stream) {
+            const videoGrid = document.getElementById('videoGrid');
+
+            const container = document.createElement('div');
+            container.className = 'video-container';
+            container.id = `video-${id}`;
+
+            const video = document.createElement('video');
+            video.className = 'video-element';
+            video.autoplay = true;
+            video.muted = true;
+            if (stream) video.srcObject = stream;
+
+            container.appendChild(video);
+            container.innerHTML += `<div class="video-label">${label}</div>`;
+
+            videoGrid.appendChild(container);
+        }
+
         function stopScreenShare() {
             if (screenStream) {
                 screenStream.getTracks().forEach(track => track.stop());
                 screenStream = null;
             }
             
-            removeVideoElement('screen');
+            const screenElement = document.getElementById('video-screen');
+            if (screenElement) {
+                screenElement.remove();
+            }
+            
             document.getElementById('screenBtn').textContent = '📺 Screen';
             document.getElementById('screenBtn').className = 'btn btn-primary';
             isScreenSharing = false;
@@ -1392,6 +1299,17 @@
                     isScreenSharing: isScreenSharing
                 });
             }
+        }
+
+        function cleanupVoiceChat() {
+            // Close all peer connections
+            Object.keys(peerConnections).forEach(userId => {
+                peerConnections[userId].close();
+                removeVoiceElement(userId);
+            });
+            peerConnections = {};
+            connectedUsers.clear();
+            isInVoiceChat = false;
         }
 
         function leaveRoom() {
@@ -1412,13 +1330,14 @@
             }
             stopScreenShare();
 
-            // Clean up calls
-            endAllCalls();
+            // Clean up voice chat
+            cleanupVoiceChat();
 
             // Reset UI
             document.getElementById('joinForm').style.display = 'block';
             document.getElementById('welcomeScreen').style.display = 'block';
             document.getElementById('contentArea').style.display = 'none';
+            document.getElementById('voiceControls').style.display = 'none';
             document.getElementById('micBtn').disabled = true;
             document.getElementById('screenBtn').disabled = true;
             document.getElementById('leaveBtn').disabled = true;
@@ -1452,13 +1371,7 @@
                 const userItem = document.createElement('div');
                 userItem.className = 'user-item';
                 userItem.dataset.userId = user.id;
-                
-                // Add click handler for calling users (except self)
-                if (user.id !== currentUser.id) {
-                    userItem.onclick = () => callUser(user.id, user.username);
-                    userItem.style.cursor = 'pointer';
-                    userItem.title = `Click to call ${user.username}`;
-                }
+                userItem.id = `user-${user.id}`;
                 
                 userItem.innerHTML = `
                     <div class="user-avatar">${user.username[0].toUpperCase()}</div>
@@ -1467,52 +1380,9 @@
                         <div class="user-status">Voice connected</div>
                     </div>
                     <div class="status-indicator status-online"></div>
-                    ${user.id !== currentUser.id ? '<button class="call-btn" onclick="event.stopPropagation(); callUser(\'' + user.id + '\', \'' + user.username + '\')">📞</button>' : ''}
                 `;
                 usersList.appendChild(userItem);
             });
-        }
-
-        function addVideoElement(id, label, stream, isAudio = false) {
-            const videoGrid = document.getElementById('videoGrid');
-            
-            // Clear welcome message
-            if (videoGrid.children.length === 1 && videoGrid.children[0].style.display !== 'none') {
-                videoGrid.innerHTML = '';
-            }
-
-            const container = document.createElement('div');
-            container.className = 'video-container';
-            container.id = `video-${id}`;
-
-            if (isAudio) {
-                container.innerHTML = `
-                    <div class="video-element" style="display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #667eea, #764ba2);">
-                        <div style="text-align: center;">
-                            <div style="font-size: 32px; margin-bottom: 8px;">🎤</div>
-                            <div style="font-weight: 600; font-size: 14px;">${label}</div>
-                            <div style="font-size: 11px; opacity: 0.8; margin-top: 4px;">Audio Only</div>
-                        </div>
-                    </div>
-                    <div class="video-label">${label}</div>
-                `;
-            } else {
-                const video = document.createElement('video');
-                video.className = 'video-element';
-                video.autoplay = true;
-                video.muted = id === 'local' || id === 'screen';
-                if (stream) video.srcObject = stream;
-
-                container.appendChild(video);
-                container.innerHTML += `<div class="video-label">${label}</div>`;
-            }
-
-            videoGrid.appendChild(container);
-        }
-
-        function removeVideoElement(id) {
-            const element = document.getElementById(`video-${id}`);
-            if (element) element.remove();
         }
 
         function clearVideoGrid() {
@@ -1520,10 +1390,10 @@
             videoGrid.innerHTML = `
                 <div style="display: flex; align-items: center; justify-content: center; height: 200px; opacity: 0.6;">
                     <div style="text-align: center;">
-                        <h3 style="font-size: 16px; margin-bottom: 10px;">🎙️ Voice Chat Ready</h3>
+                        <h3 style="font-size: 16px; margin-bottom: 10px;">🎙️ Group Voice Chat Ready</h3>
                         <p style="font-size: 13px;">Join a room to start talking with friends</p>
                         <p style="margin-top: 15px; font-size: 12px; opacity: 0.8;">
-                            ✨ Features: Voice chat, Screen sharing, Text chat
+                            ✨ Features: Group voice chat, Screen sharing, Text chat
                         </p>
                     </div>
                 </div>
@@ -1636,10 +1506,7 @@
                     'screen_stop': [659, 523],
                     'message_sent': [880],
                     'message_received': [660],
-                    'error': [220, 220, 220],
-                    'incoming_call': [880, 1108],
-                    'call_connected': [523, 659, 784],
-                    'call_ended': [392, 330, 262]
+                    'error': [220, 220, 220]
                 };
 
                 const freqs = frequencies[type] || [440];
