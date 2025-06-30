@@ -881,7 +881,7 @@ app.get('/api/debug/webrtc', (req, res) => {
 
 // Serve the frontend HTML file
 app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+    res.sendFile(path.join(__dirname, 'index.html'));
 });
 
 // Error handling middleware
@@ -906,10 +906,35 @@ function cleanup() {
 process.on('SIGTERM', cleanup);
 process.on('SIGINT', cleanup);
 
-// Periodic cleanup of empty rooms and old messages
+// Periodic cleanup of empty rooms and old messages - COMPLETE FUNCTION
 setInterval(() => {
     let cleaned = 0;
     for (const [roomName, room] of rooms.entries()) {
         // Remove empty non-persistent rooms older than 1 hour
         if (room.isEmpty() && 
             !['general', 'gaming', 'study', 'music', 'private'].includes(roomName) &&
+            Date.now() - room.createdAt.getTime() > 3600000) {
+            rooms.delete(roomName);
+            roomPasswords.delete(roomName);
+            cleaned++;
+        }
+    }
+    
+    // Clean up old message histories
+    for (const [socketId, history] of userMessageHistory.entries()) {
+        if (Date.now() - history.lastReset > 3600000) { // 1 hour old
+            userMessageHistory.delete(socketId);
+        }
+    }
+    
+    if (cleaned > 0) {
+        console.log(`Cleaned up ${cleaned} empty rooms`);
+    }
+}, 300000); // Run every 5 minutes
+
+const PORT = process.env.PORT || 3001;
+server.listen(PORT, () => {
+    console.log(`📝 MemoChat Server running on port ${PORT}`);
+    console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+    console.log(`Frontend URL: ${process.env.FRONTEND_URL || 'http://localhost:3000'}`);
+});
