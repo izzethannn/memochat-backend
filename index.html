@@ -25,32 +25,66 @@
             height: 100vh;
         }
 
+        /* Mobile-first responsive design */
         .sidebar {
-            width: 300px;
+            width: 100%;
             background: rgba(0, 0, 0, 0.3);
             backdrop-filter: blur(10px);
-            padding: 20px;
+            padding: 15px;
             border-right: 1px solid rgba(255, 255, 255, 0.1);
+            overflow-y: auto;
         }
 
         .main-content {
+            display: none;
             flex: 1;
-            display: flex;
             flex-direction: column;
-            padding: 20px;
+            padding: 15px;
             position: relative;
+            overflow: hidden;
+        }
+
+        .main-content.active {
+            display: flex;
+        }
+
+        /* Desktop styles */
+        @media (min-width: 768px) {
+            .sidebar {
+                width: 300px;
+                padding: 20px;
+            }
+            
+            .main-content {
+                display: flex;
+                padding: 20px;
+            }
+            
+            .main-content.active {
+                display: flex;
+            }
         }
 
         .content-area {
             flex: 1;
             display: flex;
-            gap: 20px;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        /* Mobile: Stack video and chat vertically */
+        @media (min-width: 768px) {
+            .content-area {
+                flex-direction: row;
+                gap: 20px;
+            }
         }
 
         .video-section {
-            flex: 2;
+            flex: 1;
             display: flex;
             flex-direction: column;
+            min-height: 250px;
         }
 
         .chat-section {
@@ -60,34 +94,49 @@
             background: rgba(0, 0, 0, 0.2);
             border-radius: 10px;
             overflow: hidden;
-            min-width: 300px;
-            max-width: 400px;
+            min-height: 300px;
+        }
+
+        @media (min-width: 768px) {
+            .chat-section {
+                flex: 0 0 350px;
+                max-width: 400px;
+                min-height: auto;
+            }
         }
 
         .chat-header {
             background: rgba(0, 0, 0, 0.3);
-            padding: 15px;
+            padding: 12px 15px;
             border-bottom: 1px solid rgba(255, 255, 255, 0.1);
             font-weight: 600;
+            font-size: 14px;
         }
 
         .chat-messages {
             flex: 1;
-            padding: 15px;
+            padding: 10px 15px;
             overflow-y: auto;
-            max-height: 400px;
+            max-height: 250px;
+        }
+
+        @media (min-width: 768px) {
+            .chat-messages {
+                max-height: 400px;
+                padding: 15px;
+            }
         }
 
         .chat-input-area {
-            padding: 15px;
+            padding: 10px 15px;
             border-top: 1px solid rgba(255, 255, 255, 0.1);
             display: flex;
-            gap: 10px;
+            gap: 8px;
         }
 
         .chat-input {
             flex: 1;
-            padding: 10px;
+            padding: 8px 12px;
             border: none;
             border-radius: 6px;
             background: rgba(255, 255, 255, 0.1);
@@ -100,13 +149,14 @@
         }
 
         .chat-send-btn {
-            padding: 10px 15px;
+            padding: 8px 12px;
             background: #7289da;
             border: none;
             border-radius: 6px;
             color: white;
             cursor: pointer;
             font-weight: 600;
+            font-size: 12px;
         }
 
         .chat-send-btn:hover {
@@ -114,8 +164,8 @@
         }
 
         .message {
-            margin-bottom: 12px;
-            padding: 8px 12px;
+            margin-bottom: 10px;
+            padding: 6px 10px;
             border-radius: 8px;
             background: rgba(255, 255, 255, 0.05);
             transition: all 0.2s ease;
@@ -127,27 +177,27 @@
 
         .message-author {
             font-weight: 600;
-            font-size: 13px;
-            margin-bottom: 4px;
+            font-size: 12px;
+            margin-bottom: 2px;
             color: #7289da;
         }
 
         .message-content {
-            font-size: 14px;
+            font-size: 13px;
             line-height: 1.4;
         }
 
         .message-time {
-            font-size: 11px;
+            font-size: 10px;
             opacity: 0.6;
-            margin-left: 8px;
+            margin-left: 6px;
         }
 
         .system-message {
             background: rgba(67, 181, 129, 0.2);
             border-left: 3px solid #43b581;
             font-style: italic;
-            font-size: 13px;
+            font-size: 12px;
         }
 
         .system-message .message-author {
@@ -156,27 +206,60 @@
 
         .header {
             background: rgba(0, 0, 0, 0.2);
-            padding: 15px 20px;
+            padding: 12px 15px;
             border-radius: 10px;
-            margin-bottom: 20px;
+            margin-bottom: 15px;
             display: flex;
-            justify-content: space-between;
-            align-items: center;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        @media (min-width: 768px) {
+            .header {
+                flex-direction: row;
+                justify-content: space-between;
+                align-items: center;
+                padding: 15px 20px;
+                margin-bottom: 20px;
+                gap: 0;
+            }
+        }
+
+        .header-info h3 {
+            font-size: 16px;
+            margin-bottom: 4px;
+        }
+
+        .header-info small {
+            font-size: 12px;
+            opacity: 0.8;
         }
 
         .controls {
             display: flex;
-            gap: 10px;
+            gap: 8px;
+            flex-wrap: wrap;
         }
 
         .btn {
-            padding: 10px 20px;
+            padding: 8px 12px;
             border: none;
-            border-radius: 8px;
+            border-radius: 6px;
             cursor: pointer;
             font-weight: 600;
             transition: all 0.3s ease;
-            font-size: 14px;
+            font-size: 12px;
+            flex: 1;
+            min-width: 80px;
+        }
+
+        @media (min-width: 768px) {
+            .btn {
+                padding: 10px 20px;
+                font-size: 14px;
+                flex: none;
+                min-width: auto;
+            }
         }
 
         .btn-primary {
@@ -186,7 +269,7 @@
 
         .btn-primary:hover {
             background: #5b6eae;
-            transform: translateY(-2px);
+            transform: translateY(-1px);
         }
 
         .btn-danger {
@@ -216,16 +299,19 @@
         .users-list {
             flex: 1;
             overflow-y: auto;
+            max-height: 300px;
         }
 
         .user-item {
             display: flex;
             align-items: center;
-            padding: 12px;
-            margin: 8px 0;
+            padding: 10px;
+            margin: 6px 0;
             background: rgba(255, 255, 255, 0.1);
             border-radius: 8px;
             transition: all 0.3s ease;
+            cursor: pointer;
+            position: relative;
         }
 
         .user-item:hover {
@@ -233,15 +319,16 @@
         }
 
         .user-avatar {
-            width: 40px;
-            height: 40px;
+            width: 32px;
+            height: 32px;
             border-radius: 50%;
             background: linear-gradient(45deg, #ff6b6b, #4ecdc4);
             display: flex;
             align-items: center;
             justify-content: center;
-            margin-right: 12px;
+            margin-right: 10px;
             font-weight: bold;
+            font-size: 12px;
         }
 
         .user-info {
@@ -250,19 +337,21 @@
 
         .user-name {
             font-weight: 600;
-            margin-bottom: 4px;
+            margin-bottom: 2px;
+            font-size: 13px;
         }
 
         .user-status {
-            font-size: 12px;
+            font-size: 11px;
             opacity: 0.8;
         }
 
         .status-indicator {
-            width: 10px;
-            height: 10px;
+            width: 8px;
+            height: 8px;
             border-radius: 50%;
             margin-left: auto;
+            flex-shrink: 0;
         }
 
         .status-online {
@@ -278,6 +367,11 @@
             background: #f04747;
         }
 
+        .status-in-call {
+            background: #7289da;
+            animation: pulse 1s infinite;
+        }
+
         @keyframes pulse {
             0% { opacity: 1; }
             50% { opacity: 0.5; }
@@ -286,40 +380,52 @@
 
         .join-form {
             background: rgba(0, 0, 0, 0.2);
-            padding: 20px;
+            padding: 15px;
             border-radius: 10px;
-            margin-bottom: 20px;
+            margin-bottom: 15px;
         }
 
-        .join-form input {
+        .join-form input, .join-form select {
             width: 100%;
-            padding: 12px;
+            padding: 10px 12px;
             border: none;
             border-radius: 8px;
             background: rgba(255, 255, 255, 0.1);
             color: white;
-            margin-bottom: 15px;
-            font-size: 16px;
+            margin-bottom: 12px;
+            font-size: 14px;
         }
 
         .join-form input::placeholder {
             color: rgba(255, 255, 255, 0.6);
         }
 
+        .join-form select {
+            background: rgba(255, 255, 255, 0.9);
+            color: #333;
+        }
+
         .video-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 15px;
+            grid-template-columns: 1fr;
+            gap: 10px;
             flex: 1;
             overflow-y: auto;
+        }
+
+        @media (min-width: 768px) {
+            .video-grid {
+                grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+                gap: 15px;
+            }
         }
 
         .video-container {
             background: rgba(0, 0, 0, 0.3);
             border-radius: 10px;
-            padding: 15px;
+            padding: 12px;
             position: relative;
-            min-height: 200px;
+            min-height: 150px;
         }
 
         .video-element {
@@ -331,22 +437,23 @@
 
         .video-label {
             position: absolute;
-            bottom: 10px;
-            left: 10px;
+            bottom: 8px;
+            left: 8px;
             background: rgba(0, 0, 0, 0.7);
-            padding: 5px 10px;
-            border-radius: 5px;
-            font-size: 12px;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 11px;
         }
 
         .connection-status {
             position: fixed;
-            top: 20px;
-            right: 20px;
-            padding: 10px 15px;
-            border-radius: 8px;
-            font-size: 12px;
+            top: 10px;
+            right: 10px;
+            padding: 6px 10px;
+            border-radius: 6px;
+            font-size: 11px;
             font-weight: 600;
+            z-index: 1000;
         }
 
         .status-connected {
@@ -363,23 +470,170 @@
 
         .room-info {
             text-align: center;
-            margin-bottom: 20px;
+            margin-bottom: 15px;
         }
 
         .room-info h2 {
-            margin-bottom: 10px;
+            margin-bottom: 8px;
             color: #fff;
+            font-size: 20px;
         }
 
         .room-info p {
             opacity: 0.8;
+            font-size: 13px;
+        }
+
+        .call-controls {
+            display: none;
+            background: rgba(0, 0, 0, 0.3);
+            padding: 12px;
+            border-radius: 10px;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+
+        .call-controls.active {
+            display: block;
+        }
+
+        .call-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            padding: 20px;
+        }
+
+        .call-modal.active {
+            display: flex;
+        }
+
+        .call-modal-content {
+            background: rgba(0, 0, 0, 0.9);
+            padding: 20px;
+            border-radius: 15px;
+            text-align: center;
+            max-width: 350px;
+            width: 100%;
+        }
+
+        .call-button {
+            background: #43b581;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 6px;
+            color: white;
+            cursor: pointer;
+            font-size: 12px;
+            margin: 0 5px;
+            min-width: 70px;
+        }
+
+        .call-button:hover {
+            background: #369968;
+        }
+
+        .call-button.danger {
+            background: #f04747;
+        }
+
+        .call-button.danger:hover {
+            background: #d73c3c;
+        }
+
+        /* Mobile navigation */
+        .mobile-nav {
+            display: none;
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(0, 0, 0, 0.9);
+            padding: 10px;
+            z-index: 1000;
+        }
+
+        @media (min-width: 768px) {
+            .mobile-nav {
+                display: none !important;
+            }
+        }
+
+        .mobile-nav-btn {
+            background: #7289da;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 6px;
+            color: white;
+            cursor: pointer;
+            font-size: 12px;
+            width: 100%;
+        }
+
+        .mobile-nav-btn:hover {
+            background: #5b6eae;
+        }
+
+        /* Hide sidebar on mobile when in main content */
+        @media (max-width: 767px) {
+            .sidebar.hidden {
+                display: none;
+            }
+            
+            .main-content.mobile-active {
+                display: flex;
+                width: 100%;
+            }
+        }
+
+        .toast {
+            position: fixed;
+            bottom: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.9);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 8px;
             font-size: 14px;
+            z-index: 2000;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .toast.show {
+            opacity: 1;
+        }
+
+        .call-btn {
+            position: absolute;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: #43b581;
+            border: none;
+            padding: 4px 8px;
+            border-radius: 4px;
+            color: white;
+            cursor: pointer;
+            font-size: 10px;
+        }
+
+        .call-btn:hover {
+            background: #369968;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <div class="sidebar">
+        <div class="sidebar" id="sidebar">
             <div class="room-info">
                 <h2>📝 MemoChat</h2>
                 <p>Memorable voice chat for friends</p>
@@ -387,36 +641,42 @@
 
             <div class="join-form" id="joinForm">
                 <input type="text" id="usernameInput" placeholder="Enter your name" maxlength="20">
-                <select id="roomSelect" style="width: 100%; padding: 12px; border: none; border-radius: 8px; background: rgba(255, 255, 255, 0.9); color: #333; margin-bottom: 15px; font-size: 16px;">
-                    <option value="" style="color: #666;">Choose a room...</option>
-                    <option value="general" style="color: #333;">🏠 General Chat</option>
-                    <option value="gaming" style="color: #333;">🎮 Gaming</option>
-                    <option value="study" style="color: #333;">📚 Study Group</option>
-                    <option value="music" style="color: #333;">🎵 Music & Chill</option>
-                    <option value="private" style="color: #333;">🔒 Private Room</option>
+                <select id="roomSelect">
+                    <option value="">Choose a room...</option>
+                    <option value="general">🏠 General Chat</option>
+                    <option value="gaming">🎮 Gaming</option>
+                    <option value="study">📚 Study Group</option>
+                    <option value="music">🎵 Music & Chill</option>
+                    <option value="private">🔒 Private Room</option>
                 </select>
                 <button class="btn btn-primary" onclick="joinRoom()" style="width: 100%;">Join Voice Chat</button>
             </div>
 
+            <div class="call-controls" id="callControls">
+                <h4>🎤 Voice Call Active</h4>
+                <p id="callStatus">Connected</p>
+                <button class="btn btn-danger" onclick="endCall()" style="margin-top: 10px;">End Call</button>
+            </div>
+
             <div class="users-list" id="usersList">
-                <div style="text-align: center; opacity: 0.6; margin-top: 50px;">
+                <div style="text-align: center; opacity: 0.6; margin-top: 30px;">
                     Join a room to see other users
                 </div>
             </div>
         </div>
 
-        <div class="main-content">
+        <div class="main-content" id="mainContent">
             <div class="header">
-                <div>
+                <div class="header-info">
                     <h3 id="roomTitle">Welcome to MemoChat</h3>
                     <small id="roomSubtitle">Enter your name to get started</small>
                 </div>
                 <div class="controls">
                     <button class="btn btn-success" id="micBtn" onclick="toggleMic()" disabled>
-                        🎤 Unmuted
+                        🎤 Mic
                     </button>
                     <button class="btn btn-primary" id="screenBtn" onclick="toggleScreenShare()" disabled>
-                        📺 Share Screen
+                        📺 Screen
                     </button>
                     <button class="btn btn-danger" id="leaveBtn" onclick="leaveRoom()" disabled>
                         🚪 Leave
@@ -427,13 +687,10 @@
             <div class="content-area" id="contentArea" style="display: none;">
                 <div class="video-section">
                     <div class="video-grid" id="videoGrid">
-                        <div style="display: flex; align-items: center; justify-content: center; height: 300px; opacity: 0.6;">
+                        <div style="display: flex; align-items: center; justify-content: center; height: 200px; opacity: 0.6;">
                             <div style="text-align: center;">
-                                <h3>🎙️ Voice Chat Ready</h3>
-                                <p>Join a room to start talking with friends</p>
-                                <p style="margin-top: 20px; font-size: 14px;">
-                                    ✨ Features: Voice chat, Screen sharing, Text chat
-                                </p>
+                                <h3 style="font-size: 16px; margin-bottom: 10px;">🎙️ Voice Chat Ready</h3>
+                                <p style="font-size: 13px;">Click on a user to start voice chat</p>
                             </div>
                         </div>
                     </div>
@@ -457,11 +714,11 @@
             </div>
 
             <div class="video-grid" id="welcomeScreen">
-                <div style="display: flex; align-items: center; justify-content: center; height: 300px; opacity: 0.6;">
+                <div style="display: flex; align-items: center; justify-content: center; height: 250px; opacity: 0.6;">
                     <div style="text-align: center;">
-                        <h3>🎙️ Voice Chat Ready</h3>
-                        <p>Join a room to start talking with friends</p>
-                        <p style="margin-top: 20px; font-size: 14px;">
+                        <h3 style="font-size: 18px; margin-bottom: 10px;">🎙️ Voice Chat Ready</h3>
+                        <p style="font-size: 14px;">Join a room to start talking with friends</p>
+                        <p style="margin-top: 15px; font-size: 13px; opacity: 0.8;">
                             ✨ Features: Voice chat, Screen sharing, Text chat
                         </p>
                     </div>
@@ -470,6 +727,28 @@
         </div>
     </div>
 
+    <!-- Mobile Navigation -->
+    <div class="mobile-nav" id="mobileNav">
+        <button class="mobile-nav-btn" onclick="toggleMobileView()">
+            <span id="mobileNavText">Show Chat</span>
+        </button>
+    </div>
+
+    <!-- Call Modal -->
+    <div class="call-modal" id="callModal">
+        <div class="call-modal-content">
+            <h3 id="callModalTitle">Incoming Call</h3>
+            <p id="callModalMessage">User is calling you...</p>
+            <div style="margin-top: 20px;">
+                <button class="call-button" onclick="acceptCall()">Accept</button>
+                <button class="call-button danger" onclick="rejectCall()">Reject</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast for notifications -->
+    <div class="toast" id="toast"></div>
+
     <div class="connection-status status-disconnected" id="connectionStatus">
         Disconnected
     </div>
@@ -477,12 +756,58 @@
     <script>
         let localStream = null;
         let screenStream = null;
-        let peers = {};
         let socket = null;
         let currentRoom = null;
         let currentUser = null;
         let isMuted = false;
         let isScreenSharing = false;
+        let isMobileView = false;
+        
+        // WebRTC variables
+        let peerConnections = {};
+        let currentCall = null;
+        let incomingCall = null;
+        
+        // STUN servers for NAT traversal
+        const ICE_SERVERS = {
+            iceServers: [
+                { urls: 'stun:stun.l.google.com:19302' },
+                { urls: 'stun:stun1.l.google.com:19302' },
+                { urls: 'stun:stun2.l.google.com:19302' }
+            ]
+        };
+
+        // Mobile view management
+        function toggleMobileView() {
+            const sidebar = document.getElementById('sidebar');
+            const mainContent = document.getElementById('mainContent');
+            const mobileNavText = document.getElementById('mobileNavText');
+            
+            if (window.innerWidth <= 767) {
+                isMobileView = !isMobileView;
+                
+                if (isMobileView) {
+                    sidebar.classList.add('hidden');
+                    mainContent.classList.add('mobile-active');
+                    mobileNavText.textContent = 'Show Users';
+                } else {
+                    sidebar.classList.remove('hidden');
+                    mainContent.classList.remove('mobile-active');
+                    mobileNavText.textContent = 'Show Chat';
+                }
+            }
+        }
+
+        // Show toast notification
+        function showToast(message, duration = 3000) {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.classList.add('show');
+            
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, duration);
+        }
 
         async function initializeApp() {
             // Connect to the real backend server
@@ -496,16 +821,20 @@
             socket.on('connect', () => {
                 console.log('Connected to server:', socket.id);
                 updateConnectionStatus('connected');
+                showToast('Connected to server');
             });
 
             socket.on('disconnect', () => {
                 console.log('Disconnected from server');
                 updateConnectionStatus('disconnected');
+                endAllCalls();
+                showToast('Disconnected from server');
             });
 
             socket.on('connect_error', (error) => {
                 console.error('Connection error:', error);
                 updateConnectionStatus('disconnected');
+                showToast('Connection error');
             });
 
             // Room and user event handlers
@@ -516,20 +845,18 @@
             socket.on('user-status-update', handleUserStatusUpdate);
             
             // WebRTC signaling handlers
-            socket.on('offer', handleOffer);
-            socket.on('answer', handleAnswer);
-            socket.on('ice-candidate', handleIceCandidate);
+            socket.on('webrtc-offer', handleWebRTCOffer);
+            socket.on('webrtc-answer', handleWebRTCAnswer);
+            socket.on('webrtc-ice-candidate', handleWebRTCIceCandidate);
+            socket.on('incoming-call', handleIncomingCall);
+            socket.on('call-response', handleCallResponse);
+            socket.on('call-ended', handleCallEnded);
+            socket.on('user-disconnected', handleUserDisconnected);
             
             // Error handling
             socket.on('error', (error) => {
                 console.error('Socket error:', error);
-                alert(error.message || 'Connection error occurred');
-            });
-
-            socket.on('server-shutdown', (data) => {
-                alert(data.message);
-                // Auto-refresh after server restart
-                setTimeout(() => location.reload(), 3000);
+                showToast(error.message || 'Connection error occurred');
             });
 
             updateConnectionStatus('connecting');
@@ -540,21 +867,25 @@
             const roomValue = document.getElementById('roomSelect').value;
 
             if (!username) {
-                alert('Please enter your name');
+                showToast('Please enter your name');
                 return;
             }
 
             if (!roomValue) {
-                alert('Please select a room');
+                showToast('Please select a room');
                 return;
             }
 
             try {
                 updateConnectionStatus('connecting');
                 
-                // Get user media
+                // Get user media for voice chat
                 localStream = await navigator.mediaDevices.getUserMedia({ 
-                    audio: true, 
+                    audio: {
+                        echoCancellation: true,
+                        noiseSuppression: true,
+                        autoGainControl: true
+                    }, 
                     video: false 
                 });
 
@@ -565,18 +896,15 @@
                 };
                 currentRoom = roomValue;
 
-                // Emit to real server
                 socket.emit('join-room', {
                     userId: currentUser.id,
                     username: username,
                     room: roomValue
                 });
-
-                // UI updates will be handled by the 'room-joined' event
                 
             } catch (error) {
                 console.error('Error joining room:', error);
-                alert('Could not access microphone. Please check permissions.');
+                showToast('Could not access microphone. Please check permissions.');
                 updateConnectionStatus('disconnected');
             }
         }
@@ -614,31 +942,53 @@
             document.getElementById('screenBtn').disabled = false;
             document.getElementById('leaveBtn').disabled = false;
 
+            // Show mobile nav on mobile devices
+            if (window.innerWidth <= 767) {
+                document.getElementById('mobileNav').style.display = 'block';
+                document.getElementById('sidebar').classList.add('hidden');
+                document.getElementById('mainContent').classList.add('mobile-active');
+                isMobileView = true;
+            }
+
             playNotificationSound('join');
             updateConnectionStatus('connected');
+            showToast('Joined room successfully!');
         }
 
         function handleUserJoined(data) {
             console.log('User joined:', data);
             addChatMessage('System', `${data.username} joined the room`, true);
             playNotificationSound('join');
+            showToast(`${data.username} joined`);
         }
 
         function handleUserLeft(data) {
             console.log('User left:', data);
-            if (peers[data.userId]) {
-                peers[data.userId].close();
-                delete peers[data.userId];
+            
+            // Clean up any call connections
+            if (peerConnections[data.userId]) {
+                peerConnections[data.userId].close();
+                delete peerConnections[data.userId];
             }
+            removeAudioElement(data.userId);
             removeVideoElement(data.userId);
+            
+            // End call if it was with this user
+            if (currentCall && currentCall.userId === data.userId) {
+                currentCall = null;
+                hideCallControls();
+                showToast(`Call ended - ${data.username} left`);
+            }
+            
             addChatMessage('System', `${data.username} left the room`, true);
             playNotificationSound('leave');
+            showToast(`${data.username} left`);
         }
 
         function handleUserStatusUpdate(data) {
-            const { userId, username, isMuted, isScreenSharing } = data;
-            console.log(`${username} status: muted=${isMuted}, sharing=${isScreenSharing}`);
-            updateUserStatus(userId, { isMuted, isScreenSharing });
+            const { userId, username, isMuted, isScreenSharing, isInCall } = data;
+            console.log(`${username} status: muted=${isMuted}, sharing=${isScreenSharing}, inCall=${isInCall}`);
+            updateUserStatus(userId, { isMuted, isScreenSharing, isInCall });
         }
 
         function updateUserStatus(userId, status) {
@@ -651,7 +1001,10 @@
                     const statusIndicator = item.querySelector('.status-indicator');
                     const userStatus = item.querySelector('.user-status');
                     
-                    if (status.isMuted) {
+                    if (status.isInCall) {
+                        statusIndicator.className = 'status-indicator status-in-call';
+                        userStatus.textContent = 'In voice call';
+                    } else if (status.isMuted) {
                         statusIndicator.className = 'status-indicator status-muted';
                         userStatus.textContent = 'Muted';
                     } else if (status.isScreenSharing) {
@@ -663,6 +1016,292 @@
                     }
                 }
             });
+        }
+
+        // WebRTC Functions
+        async function callUser(targetUserId, targetName) {
+            try {
+                console.log(`Calling ${targetName}...`);
+                showToast(`Calling ${targetName}...`);
+                
+                // Create peer connection
+                const peerConnection = new RTCPeerConnection(ICE_SERVERS);
+                peerConnections[targetUserId] = peerConnection;
+                
+                // Add local stream to peer connection
+                localStream.getTracks().forEach(track => {
+                    peerConnection.addTrack(track, localStream);
+                });
+                
+                // Handle incoming stream
+                peerConnection.ontrack = (event) => {
+                    const [remoteStream] = event.streams;
+                    addAudioElement(targetUserId, targetName, remoteStream);
+                };
+                
+                // Handle ICE candidates
+                peerConnection.onicecandidate = (event) => {
+                    if (event.candidate) {
+                        socket.emit('webrtc-ice-candidate', {
+                            targetUserId: targetUserId,
+                            candidate: event.candidate,
+                            senderId: currentUser.id
+                        });
+                    }
+                };
+                
+                // Create and send offer
+                const offer = await peerConnection.createOffer();
+                await peerConnection.setLocalDescription(offer);
+                
+                socket.emit('webrtc-offer', {
+                    targetUserId: targetUserId,
+                    offer: offer,
+                    callerId: currentUser.id
+                });
+                
+                currentCall = { userId: targetUserId, userName: targetName };
+                showCallControls(targetName, 'Calling...');
+                
+            } catch (error) {
+                console.error('Error calling user:', error);
+                showToast('Could not start call. Please try again.');
+            }
+        }
+
+        async function handleWebRTCOffer(data) {
+            try {
+                console.log('Received WebRTC offer from:', data.callerName);
+                
+                const { offer, callerId, callerName } = data;
+                
+                // Create peer connection
+                const peerConnection = new RTCPeerConnection(ICE_SERVERS);
+                peerConnections[callerId] = peerConnection;
+                
+                // Add local stream
+                localStream.getTracks().forEach(track => {
+                    peerConnection.addTrack(track, localStream);
+                });
+                
+                // Handle incoming stream
+                peerConnection.ontrack = (event) => {
+                    const [remoteStream] = event.streams;
+                    addAudioElement(callerId, callerName, remoteStream);
+                };
+                
+                // Handle ICE candidates
+                peerConnection.onicecandidate = (event) => {
+                    if (event.candidate) {
+                        socket.emit('webrtc-ice-candidate', {
+                            targetUserId: callerId,
+                            candidate: event.candidate,
+                            senderId: currentUser.id
+                        });
+                    }
+                };
+                
+                // Set remote description and create answer
+                await peerConnection.setRemoteDescription(offer);
+                const answer = await peerConnection.createAnswer();
+                await peerConnection.setLocalDescription(answer);
+                
+                socket.emit('webrtc-answer', {
+                    targetUserId: callerId,
+                    answer: answer,
+                    answererId: currentUser.id
+                });
+                
+                currentCall = { userId: callerId, userName: callerName };
+                showCallControls(callerName, 'Connected');
+                playNotificationSound('call_connected');
+                showToast(`Connected to ${callerName}`);
+                
+            } catch (error) {
+                console.error('Error handling WebRTC offer:', error);
+                showToast('Failed to connect call');
+            }
+        }
+
+        async function handleWebRTCAnswer(data) {
+            try {
+                console.log('Received WebRTC answer from:', data.answererName);
+                
+                const { answer, answererId, answererName } = data;
+                const peerConnection = peerConnections[answererId];
+                
+                if (peerConnection) {
+                    await peerConnection.setRemoteDescription(answer);
+                    showCallControls(answererName, 'Connected');
+                    playNotificationSound('call_connected');
+                    showToast(`Connected to ${answererName}`);
+                }
+                
+            } catch (error) {
+                console.error('Error handling WebRTC answer:', error);
+                showToast('Failed to connect call');
+            }
+        }
+
+        async function handleWebRTCIceCandidate(data) {
+            try {
+                const { candidate, senderId } = data;
+                const peerConnection = peerConnections[senderId];
+                
+                if (peerConnection) {
+                    await peerConnection.addIceCandidate(candidate);
+                }
+                
+            } catch (error) {
+                console.error('Error handling ICE candidate:', error);
+            }
+        }
+
+        function handleIncomingCall(data) {
+            const { callerId, callerName } = data;
+            
+            incomingCall = { callerId, callerName };
+            
+            document.getElementById('callModalTitle').textContent = 'Incoming Call';
+            document.getElementById('callModalMessage').textContent = `${callerName} is calling you...`;
+            document.getElementById('callModal').classList.add('active');
+            
+            playNotificationSound('incoming_call');
+        }
+
+        function handleCallResponse(data) {
+            const { targetId, targetName, accepted } = data;
+            
+            if (accepted) {
+                showToast(`${targetName} accepted your call`);
+                // The WebRTC connection will be established through offer/answer
+            } else {
+                showToast(`${targetName} declined your call`);
+                currentCall = null;
+                hideCallControls();
+            }
+        }
+
+        function handleCallEnded(data) {
+            const { userId, userName } = data;
+            
+            if (peerConnections[userId]) {
+                peerConnections[userId].close();
+                delete peerConnections[userId];
+            }
+            
+            removeAudioElement(userId);
+            currentCall = null;
+            hideCallControls();
+            showToast(`Call ended with ${userName}`);
+            playNotificationSound('call_ended');
+        }
+
+        function handleUserDisconnected(data) {
+            const { userId } = data;
+            
+            if (peerConnections[userId]) {
+                peerConnections[userId].close();
+                delete peerConnections[userId];
+            }
+            
+            removeAudioElement(userId);
+            
+            if (currentCall && currentCall.userId === userId) {
+                currentCall = null;
+                hideCallControls();
+                showToast('Call ended - user disconnected');
+            }
+        }
+
+        function acceptCall() {
+            if (!incomingCall) return;
+            
+            const { callerId, callerName } = incomingCall;
+            
+            socket.emit('call-response', {
+                callerId: callerId,
+                accepted: true
+            });
+            
+            document.getElementById('callModal').classList.remove('active');
+            incomingCall = null;
+        }
+
+        function rejectCall() {
+            if (!incomingCall) return;
+            
+            const { callerId } = incomingCall;
+            
+            socket.emit('call-response', {
+                callerId: callerId,
+                accepted: false
+            });
+            
+            document.getElementById('callModal').classList.remove('active');
+            incomingCall = null;
+        }
+
+        function endCall() {
+            if (!currentCall) return;
+            
+            socket.emit('end-call', {
+                targetUserId: currentCall.userId
+            });
+            
+            // Clean up local peer connection
+            if (peerConnections[currentCall.userId]) {
+                peerConnections[currentCall.userId].close();
+                delete peerConnections[currentCall.userId];
+            }
+            
+            removeAudioElement(currentCall.userId);
+            currentCall = null;
+            hideCallControls();
+            showToast('Call ended');
+            playNotificationSound('call_ended');
+        }
+
+        function endAllCalls() {
+            Object.keys(peerConnections).forEach(userId => {
+                peerConnections[userId].close();
+                removeAudioElement(userId);
+            });
+            peerConnections = {};
+            currentCall = null;
+            hideCallControls();
+        }
+
+        function showCallControls(userName, status) {
+            document.getElementById('callControls').classList.add('active');
+            document.getElementById('callStatus').textContent = `${status} with ${userName}`;
+        }
+
+        function hideCallControls() {
+            document.getElementById('callControls').classList.remove('active');
+        }
+
+        function addAudioElement(userId, userName, stream) {
+            // Remove existing audio element if any
+            removeAudioElement(userId);
+            
+            const audioElement = document.createElement('audio');
+            audioElement.id = `audio-${userId}`;
+            audioElement.srcObject = stream;
+            audioElement.autoplay = true;
+            audioElement.style.display = 'none';
+            document.body.appendChild(audioElement);
+            
+            // Add visual indicator in video grid
+            addVideoElement(`call-${userId}`, `🎤 ${userName} (Voice)`, null, true);
+        }
+
+        function removeAudioElement(userId) {
+            const audioElement = document.getElementById(`audio-${userId}`);
+            if (audioElement) {
+                audioElement.remove();
+            }
+            removeVideoElement(`call-${userId}`);
         }
 
         function toggleMic() {
@@ -678,10 +1317,12 @@
                     micBtn.textContent = '🔇 Muted';
                     micBtn.className = 'btn btn-danger';
                     playNotificationSound('muted');
+                    showToast('Microphone muted');
                 } else {
-                    micBtn.textContent = '🎤 Unmuted';
+                    micBtn.textContent = '🎤 Mic';
                     micBtn.className = 'btn btn-success';
                     playNotificationSound('unmuted');
+                    showToast('Microphone unmuted');
                 }
 
                 // Notify server of status change
@@ -704,10 +1345,11 @@
                     
                     addVideoElement('screen', 'Your Screen Share', screenStream);
                     
-                    document.getElementById('screenBtn').textContent = '⏹️ Stop Share';
+                    document.getElementById('screenBtn').textContent = '⏹️ Stop';
                     document.getElementById('screenBtn').className = 'btn btn-danger';
                     isScreenSharing = true;
                     playNotificationSound('screen_start');
+                    showToast('Screen sharing started');
 
                     screenStream.getVideoTracks()[0].onended = () => {
                         stopScreenShare();
@@ -725,7 +1367,7 @@
                 }
             } catch (error) {
                 console.error('Error sharing screen:', error);
-                alert('Could not share screen. Please try again.');
+                showToast('Could not share screen. Please try again.');
                 playNotificationSound('error');
             }
         }
@@ -737,10 +1379,11 @@
             }
             
             removeVideoElement('screen');
-            document.getElementById('screenBtn').textContent = '📺 Share Screen';
+            document.getElementById('screenBtn').textContent = '📺 Screen';
             document.getElementById('screenBtn').className = 'btn btn-primary';
             isScreenSharing = false;
             playNotificationSound('screen_stop');
+            showToast('Screen sharing stopped');
 
             // Notify server
             if (socket && currentUser) {
@@ -760,6 +1403,7 @@
             }
 
             playNotificationSound('leave');
+            showToast('Left the room');
 
             // Clean up streams
             if (localStream) {
@@ -768,9 +1412,8 @@
             }
             stopScreenShare();
 
-            // Clean up peers
-            Object.values(peers).forEach(peer => peer.close());
-            peers = {};
+            // Clean up calls
+            endAllCalls();
 
             // Reset UI
             document.getElementById('joinForm').style.display = 'block';
@@ -781,6 +1424,16 @@
             document.getElementById('leaveBtn').disabled = true;
             document.getElementById('roomTitle').textContent = 'Welcome to MemoChat';
             document.getElementById('roomSubtitle').textContent = 'Enter your name to get started';
+
+            // Hide mobile nav
+            document.getElementById('mobileNav').style.display = 'none';
+            
+            // Reset mobile view
+            if (window.innerWidth <= 767) {
+                document.getElementById('sidebar').classList.remove('hidden');
+                document.getElementById('mainContent').classList.remove('mobile-active');
+                isMobileView = false;
+            }
 
             clearVideoGrid();
             clearUsersList();
@@ -799,13 +1452,22 @@
                 const userItem = document.createElement('div');
                 userItem.className = 'user-item';
                 userItem.dataset.userId = user.id;
+                
+                // Add click handler for calling users (except self)
+                if (user.id !== currentUser.id) {
+                    userItem.onclick = () => callUser(user.id, user.username);
+                    userItem.style.cursor = 'pointer';
+                    userItem.title = `Click to call ${user.username}`;
+                }
+                
                 userItem.innerHTML = `
                     <div class="user-avatar">${user.username[0].toUpperCase()}</div>
                     <div class="user-info">
-                        <div class="user-name">${user.username}</div>
+                        <div class="user-name">${user.username}${user.id === currentUser.id ? ' (You)' : ''}</div>
                         <div class="user-status">Voice connected</div>
                     </div>
                     <div class="status-indicator status-online"></div>
+                    ${user.id !== currentUser.id ? '<button class="call-btn" onclick="event.stopPropagation(); callUser(\'' + user.id + '\', \'' + user.username + '\')">📞</button>' : ''}
                 `;
                 usersList.appendChild(userItem);
             });
@@ -827,9 +1489,9 @@
                 container.innerHTML = `
                     <div class="video-element" style="display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #667eea, #764ba2);">
                         <div style="text-align: center;">
-                            <div style="font-size: 48px; margin-bottom: 10px;">🎤</div>
-                            <div style="font-weight: 600;">${label}</div>
-                            <div style="font-size: 12px; opacity: 0.8; margin-top: 5px;">Audio Only</div>
+                            <div style="font-size: 32px; margin-bottom: 8px;">🎤</div>
+                            <div style="font-weight: 600; font-size: 14px;">${label}</div>
+                            <div style="font-size: 11px; opacity: 0.8; margin-top: 4px;">Audio Only</div>
                         </div>
                     </div>
                     <div class="video-label">${label}</div>
@@ -856,11 +1518,11 @@
         function clearVideoGrid() {
             const videoGrid = document.getElementById('videoGrid');
             videoGrid.innerHTML = `
-                <div style="display: flex; align-items: center; justify-content: center; height: 300px; opacity: 0.6;">
+                <div style="display: flex; align-items: center; justify-content: center; height: 200px; opacity: 0.6;">
                     <div style="text-align: center;">
-                        <h3>🎙️ Voice Chat Ready</h3>
-                        <p>Join a room to start talking with friends</p>
-                        <p style="margin-top: 20px; font-size: 14px;">
+                        <h3 style="font-size: 16px; margin-bottom: 10px;">🎙️ Voice Chat Ready</h3>
+                        <p style="font-size: 13px;">Join a room to start talking with friends</p>
+                        <p style="margin-top: 15px; font-size: 12px; opacity: 0.8;">
                             ✨ Features: Voice chat, Screen sharing, Text chat
                         </p>
                     </div>
@@ -874,7 +1536,6 @@
 
             if (!message || !currentUser || !socket) return;
 
-            // Send to server (the server will broadcast back to all users including sender)
             socket.emit('chat-message', {
                 message: message
             });
@@ -935,7 +1596,7 @@
 
         function clearUsersList() {
             document.getElementById('usersList').innerHTML = `
-                <div style="text-align: center; opacity: 0.6; margin-top: 50px;">
+                <div style="text-align: center; opacity: 0.6; margin-top: 30px;">
                     Join a room to see other users
                 </div>
             `;
@@ -961,34 +1622,24 @@
             return Math.random().toString(36).substr(2, 9);
         }
 
-        // WebRTC handlers (simplified for demo)
-        function handleOffer(data) {
-            console.log('Received offer:', data);
-        }
-
-        function handleAnswer(data) {
-            console.log('Received answer:', data);
-        }
-
-        function handleIceCandidate(data) {
-            console.log('Received ICE candidate:', data);
-        }
-
         // Audio feedback system
         function playNotificationSound(type) {
             try {
                 const audioContext = new (window.AudioContext || window.webkitAudioContext)();
                 
                 const frequencies = {
-                    'join': [440, 554, 659], // A-C#-E chord
-                    'leave': [659, 554, 440], // E-C#-A chord (reverse)
-                    'muted': [330], // E note (lower)
-                    'unmuted': [440], // A note
-                    'screen_start': [523, 659], // C-E
-                    'screen_stop': [659, 523], // E-C
-                    'message_sent': [880], // A (higher)
-                    'message_received': [660], // E (middle)
-                    'error': [220, 220, 220] // Low A repeated
+                    'join': [440, 554, 659],
+                    'leave': [659, 554, 440],
+                    'muted': [330],
+                    'unmuted': [440],
+                    'screen_start': [523, 659],
+                    'screen_stop': [659, 523],
+                    'message_sent': [880],
+                    'message_received': [660],
+                    'error': [220, 220, 220],
+                    'incoming_call': [880, 1108],
+                    'call_connected': [523, 659, 784],
+                    'call_ended': [392, 330, 262]
                 };
 
                 const freqs = frequencies[type] || [440];
@@ -1013,7 +1664,6 @@
                     }, index * 100);
                 });
             } catch (error) {
-                // Silently handle audio context errors
                 console.log('Audio notification not available');
             }
         }
@@ -1029,6 +1679,23 @@
         document.addEventListener('keypress', function(e) {
             if (e.target.id === 'chatInput' && e.key === 'Enter') {
                 sendMessage();
+            }
+        });
+
+        // Handle window resize for mobile responsiveness
+        window.addEventListener('resize', function() {
+            if (window.innerWidth > 767) {
+                document.getElementById('sidebar').classList.remove('hidden');
+                document.getElementById('mainContent').classList.remove('mobile-active');
+                document.getElementById('mobileNav').style.display = 'none';
+                isMobileView = false;
+            } else if (currentUser) {
+                document.getElementById('mobileNav').style.display = 'block';
+                if (!isMobileView) {
+                    document.getElementById('sidebar').classList.add('hidden');
+                    document.getElementById('mainContent').classList.add('mobile-active');
+                    isMobileView = true;
+                }
             }
         });
     </script>
