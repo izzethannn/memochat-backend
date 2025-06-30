@@ -122,6 +122,7 @@ class User {
         this.joinedAt = new Date();
         this.messageCount = 0;
         this.lastMessageTime = 0;
+        this.screenShareStartTime = null;
     }
 }
 
@@ -391,13 +392,16 @@ io.on('connection', (socket) => {
             // Forward offer to specific user
             const targetUser = Array.from(users.values()).find(u => u.id === targetUserId);
             if (targetUser) {
+                console.log(`Forwarding ${isScreenShare ? 'screen share' : 'voice'} offer from ${user.username} to ${targetUser.username}`);
+                
                 io.to(targetUser.socketId).emit('webrtc-offer', {
                     offer: offer,
                     callerId: callerId,
                     callerName: user.username,
                     isScreenShare: isScreenShare || false
                 });
-                console.log(`WebRTC offer from ${user.username} to ${targetUser.username}${isScreenShare ? ' (screen share)' : ''}`);
+            } else {
+                console.warn(`Target user ${targetUserId} not found for WebRTC offer`);
             }
         }
     });
@@ -410,19 +414,22 @@ io.on('connection', (socket) => {
             // Forward answer to caller
             const targetUser = Array.from(users.values()).find(u => u.id === targetUserId);
             if (targetUser) {
+                console.log(`Forwarding ${isScreenShare ? 'screen share' : 'voice'} answer from ${user.username} to ${targetUser.username}`);
+                
                 io.to(targetUser.socketId).emit('webrtc-answer', {
                     answer: answer,
                     answererId: answererId,
                     answererName: user.username,
                     isScreenShare: isScreenShare || false
                 });
-                console.log(`WebRTC answer from ${user.username} to ${targetUser.username}${isScreenShare ? ' (screen share)' : ''}`);
+            } else {
+                console.warn(`Target user ${targetUserId} not found for WebRTC answer`);
             }
         }
     });
 
     socket.on('webrtc-ice-candidate', (data) => {
-        const { targetUserId, candidate, senderId } = data;
+        const { targetUserId, candidate, senderId, isScreenShare } = data;
         const user = users.get(socket.id);
         
         if (user && user.room) {
@@ -431,42 +438,92 @@ io.on('connection', (socket) => {
             if (targetUser) {
                 io.to(targetUser.socketId).emit('webrtc-ice-candidate', {
                     candidate: candidate,
-                    senderId: senderId
+                    senderId: senderId,
+                    isScreenShare: isScreenShare || false
                 });
             }
         }
     });
 
-    // Handle screen share specific events
+    // Enhanced screen share start handler
     socket.on('screen-share-start', (data) => {
         const user = users.get(socket.id);
         if (user && user.room) {
             user.isScreenSharing = true;
+            user.screenShareStartTime = new Date();
+            
+            console.log(`${user.username} started screen sharing in room ${user.room}`);
             
             // Notify all users in room about screen share
             socket.to(user.room).emit('user-screen-share-start', {
                 userId: user.id,
-                username: user.username
+                username: user.username,
+                roomName: user.room
             });
             
-            console.log(`${user.username} started screen sharing`);
+            // Also broadcast updated user status
+            socket.to(user.room).emit('user-status-update', {
+                userId: user.id,
+                username: user.username,
+                isMuted: user.isMuted,
+                isScreenSharing: true,
+                isInCall: user.isInCall
+            });
+            
+            // Add system message to chat
+            const room = rooms.get(user.room);
+            if (room) {
+                const systemMessage = {
+                    id: Date.now(),
+                    username: 'System',
+                    message: `${user.username} started sharing their screen`,
+                    isSystem: true
+                };
+                room.addMessage(systemMessage);
+                io.to(user.room).emit('chat-message', systemMessage);
+            }
         }
     });
 
+    // Enhanced screen share stop handler
     socket.on('screen-share-stop', (data) => {
         const user = users.get(socket.id);
         if (user && user.room) {
             user.isScreenSharing = false;
+            user.screenShareStartTime = null;
+            
+            console.log(`${user.username} stopped screen sharing in room ${user.room}`);
             
             // Notify all users in room about screen share stop
             socket.to(user.room).emit('user-screen-share-stop', {
                 userId: user.id,
-                username: user.username
+                username: user.username,
+                roomName: user.room
             });
             
-            console.log(`${user.username} stopped screen sharing`);
+            // Also broadcast updated user status
+            socket.to(user.room).emit('user-status-update', {
+                userId: user.id,
+                username: user.username,
+                isMuted: user.isMuted,
+                isScreenSharing: false,
+                isInCall: user.isInCall
+            });
+            
+            // Add system message to chat
+            const room = rooms.get(user.room);
+            if (room) {
+                const systemMessage = {
+                    id: Date.now(),
+                    username: 'System',
+                    message: `${user.username} stopped sharing their screen`,
+                    isSystem: true
+                };
+                room.addMessage(systemMessage);
+                io.to(user.room).emit('chat-message', systemMessage);
+            }
         }
-    });
+    });    
 
     // Handle when user wants to start voice call with someone
     socket.on('call-user', (data) => {
@@ -630,10 +687,34 @@ function updateUserCallStatus(user) {
     }
 }
 
-// Helper function to handle user leaving
+// Enhanced helper function to handle user leaving
 function handleUserLeave(socket, userId = null) {
     const user = users.get(socket.id);
     if (!user) return;
+    
+    // If user was screen sharing, notify others
+    if (user.isScreenSharing) {
+        console.log(`User ${user.username} disconnected while screen sharing`);
+        
+        socket.to(user.room).emit('user-screen-share-stop', {
+            userId: user.id,
+            username: user.username,
+            disconnected: true
+        });
+        
+        // Add system message
+        const room = rooms.get(user.room);
+        if (room) {
+            const systemMessage = {
+                id: Date.now(),
+                username: 'System',
+                message: `${user.username} stopped sharing (disconnected)`,
+                isSystem: true
+            };
+            room.addMessage(systemMessage);
+            socket.to(user.room).emit('chat-message', systemMessage);
+        }
+    }
     
     // End any active calls
     if (user.isInCall && user.callPartner) {
@@ -745,6 +826,59 @@ app.get('/api/room/:roomName', (req, res) => {
     });
 });
 
+// API endpoint to get room screen sharing status
+app.get('/api/room/:roomName/screenshare', (req, res) => {
+    const { roomName } = req.params;
+    
+    if (!isValidRoomName(roomName)) {
+        return res.status(400).json({ error: 'Invalid room name' });
+    }
+    
+    const room = rooms.get(roomName);
+    if (!room) {
+        return res.json({
+            room: roomName,
+            screenSharingSessions: [],
+            totalSessions: 0
+        });
+    }
+    
+    const screenSharingSessions = room.getUsers()
+        .filter(user => user.isScreenSharing)
+        .map(user => ({
+            userId: user.id,
+            username: user.username,
+            startTime: user.screenShareStartTime || null
+        }));
+    
+    res.json({
+        room: roomName,
+        screenSharingSessions,
+        totalSessions: screenSharingSessions.length
+    });
+});
+
+// Debug endpoint for troubleshooting
+app.get('/api/debug/webrtc', (req, res) => {
+    const debugInfo = {
+        totalUsers: users.size,
+        totalRooms: rooms.size,
+        usersScreenSharing: Array.from(users.values())
+            .filter(u => u.isScreenSharing)
+            .map(u => ({ username: u.username, room: u.room })),
+        roomsWithScreenShare: Array.from(rooms.entries())
+            .filter(([name, room]) => room.getUsers().some(u => u.isScreenSharing))
+            .map(([name, room]) => ({
+                roomName: name,
+                usersSharingScreen: room.getUsers()
+                    .filter(u => u.isScreenSharing)
+                    .map(u => u.username)
+            }))
+    };
+    
+    res.json(debugInfo);
+});
+
 // Serve the frontend HTML file
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
@@ -779,28 +913,3 @@ setInterval(() => {
         // Remove empty non-persistent rooms older than 1 hour
         if (room.isEmpty() && 
             !['general', 'gaming', 'study', 'music', 'private'].includes(roomName) &&
-            Date.now() - room.createdAt.getTime() > 3600000) {
-            rooms.delete(roomName);
-            roomPasswords.delete(roomName);
-            cleaned++;
-        }
-    }
-    
-    // Clean up old message histories
-    for (const [socketId, history] of userMessageHistory.entries()) {
-        if (Date.now() - history.lastReset > 3600000) { // 1 hour old
-            userMessageHistory.delete(socketId);
-        }
-    }
-    
-    if (cleaned > 0) {
-        console.log(`Cleaned up ${cleaned} empty rooms`);
-    }
-}, 300000); // Run every 5 minutes
-
-const PORT = process.env.PORT || 3001;
-server.listen(PORT, () => {
-    console.log(`📝 MemoChat Server running on port ${PORT}`);
-    console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
-    console.log(`Frontend URL: ${process.env.FRONTEND_URL || 'http://localhost:3000'}`);
-});
