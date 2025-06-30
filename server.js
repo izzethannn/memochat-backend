@@ -100,6 +100,8 @@ class User {
         this.room = null;
         this.isMuted = false;
         this.isScreenSharing = false;
+        this.isInCall = false;
+        this.callPartner = null;
         this.joinedAt = new Date();
     }
 }
@@ -240,7 +242,130 @@ io.on('connection', (socket) => {
         }
     });
     
-    // WebRTC signaling
+    // Enhanced WebRTC signaling for voice chat
+    socket.on('webrtc-offer', (data) => {
+        const { targetUserId, offer, callerId } = data;
+        const user = users.get(socket.id);
+        
+        if (user && user.room) {
+            // Forward offer to specific user
+            const targetUser = Array.from(users.values()).find(u => u.id === targetUserId);
+            if (targetUser) {
+                io.to(targetUser.socketId).emit('webrtc-offer', {
+                    offer: offer,
+                    callerId: callerId,
+                    callerName: user.username
+                });
+                console.log(`WebRTC offer from ${user.username} to ${targetUser.username}`);
+            }
+        }
+    });
+
+    socket.on('webrtc-answer', (data) => {
+        const { targetUserId, answer, answererId } = data;
+        const user = users.get(socket.id);
+        
+        if (user && user.room) {
+            // Forward answer to caller
+            const targetUser = Array.from(users.values()).find(u => u.id === targetUserId);
+            if (targetUser) {
+                io.to(targetUser.socketId).emit('webrtc-answer', {
+                    answer: answer,
+                    answererId: answererId,
+                    answererName: user.username
+                });
+                console.log(`WebRTC answer from ${user.username} to ${targetUser.username}`);
+            }
+        }
+    });
+
+    socket.on('webrtc-ice-candidate', (data) => {
+        const { targetUserId, candidate, senderId } = data;
+        const user = users.get(socket.id);
+        
+        if (user && user.room) {
+            // Forward ICE candidate to target user
+            const targetUser = Array.from(users.values()).find(u => u.id === targetUserId);
+            if (targetUser) {
+                io.to(targetUser.socketId).emit('webrtc-ice-candidate', {
+                    candidate: candidate,
+                    senderId: senderId
+                });
+            }
+        }
+    });
+
+    // Handle when user wants to start voice call with someone
+    socket.on('call-user', (data) => {
+        const { targetUserId } = data;
+        const user = users.get(socket.id);
+        
+        if (user && user.room) {
+            const targetUser = Array.from(users.values()).find(u => u.id === targetUserId);
+            if (targetUser) {
+                io.to(targetUser.socketId).emit('incoming-call', {
+                    callerId: user.id,
+                    callerName: user.username
+                });
+                console.log(`${user.username} is calling ${targetUser.username}`);
+            }
+        }
+    });
+
+    // Handle call responses
+    socket.on('call-response', (data) => {
+        const { callerId, accepted } = data;
+        const user = users.get(socket.id);
+        
+        if (user) {
+            const callerUser = Array.from(users.values()).find(u => u.id === callerId);
+            if (callerUser) {
+                io.to(callerUser.socketId).emit('call-response', {
+                    targetId: user.id,
+                    targetName: user.username,
+                    accepted: accepted
+                });
+                
+                // Update call status for both users
+                if (accepted) {
+                    user.isInCall = true;
+                    user.callPartner = callerId;
+                    callerUser.isInCall = true;
+                    callerUser.callPartner = user.id;
+                    
+                    // Notify room about call status change
+                    updateUserCallStatus(user);
+                    updateUserCallStatus(callerUser);
+                }
+                
+                console.log(`${user.username} ${accepted ? 'accepted' : 'rejected'} call from ${callerUser.username}`);
+            }
+        }
+    });
+
+    // Handle ending calls
+    socket.on('end-call', (data) => {
+        const { targetUserId } = data;
+        const user = users.get(socket.id);
+        
+        if (user) {
+            // End call for both users
+            endCallForUser(user);
+            
+            if (targetUserId) {
+                const targetUser = Array.from(users.values()).find(u => u.id === targetUserId);
+                if (targetUser) {
+                    endCallForUser(targetUser);
+                    io.to(targetUser.socketId).emit('call-ended', {
+                        userId: user.id,
+                        userName: user.username
+                    });
+                }
+            }
+        }
+    });
+    
+    // Original WebRTC signaling (for backward compatibility)
     socket.on('offer', (data) => {
         const { targetUserId, offer } = data;
         const user = users.get(socket.id);
@@ -296,7 +421,8 @@ io.on('connection', (socket) => {
             userId: user.id,
             username: user.username,
             isMuted,
-            isScreenSharing
+            isScreenSharing,
+            isInCall: user.isInCall
         });
     });
     
@@ -307,10 +433,44 @@ io.on('connection', (socket) => {
     });
 });
 
+// Helper function to end call for a user
+function endCallForUser(user) {
+    if (user.isInCall) {
+        user.isInCall = false;
+        user.callPartner = null;
+        updateUserCallStatus(user);
+    }
+}
+
+// Helper function to update user call status in room
+function updateUserCallStatus(user) {
+    if (user.room) {
+        io.to(user.room).emit('user-status-update', {
+            userId: user.id,
+            username: user.username,
+            isMuted: user.isMuted,
+            isScreenSharing: user.isScreenSharing,
+            isInCall: user.isInCall
+        });
+    }
+}
+
 // Helper function to handle user leaving
 function handleUserLeave(socket, userId = null) {
     const user = users.get(socket.id);
     if (!user) return;
+    
+    // End any active calls
+    if (user.isInCall && user.callPartner) {
+        const partnerUser = Array.from(users.values()).find(u => u.id === user.callPartner);
+        if (partnerUser) {
+            endCallForUser(partnerUser);
+            io.to(partnerUser.socketId).emit('call-ended', {
+                userId: user.id,
+                userName: user.username
+            });
+        }
+    }
     
     const roomName = user.room;
     if (roomName && rooms.has(roomName)) {
@@ -321,6 +481,11 @@ function handleUserLeave(socket, userId = null) {
         socket.to(roomName).emit('user-left', {
             userId: user.id,
             username: user.username
+        });
+        
+        // Broadcast user disconnected for WebRTC cleanup
+        socket.to(roomName).emit('user-disconnected', {
+            userId: user.id
         });
         
         // Add system message
@@ -394,7 +559,8 @@ app.get('/api/room/:roomName', (req, res) => {
             username: user.username,
             joinedAt: user.joinedAt,
             isMuted: user.isMuted,
-            isScreenSharing: user.isScreenSharing
+            isScreenSharing: user.isScreenSharing,
+            isInCall: user.isInCall
         })),
         exists: true,
         createdAt: room.createdAt
