@@ -53,10 +53,10 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/yourusername/memochat-backend.git"
+    "url": "git+https://github.com/izzethannn/memochat-backend.git"
   },
   "bugs": {
-    "url": "https://github.com/yourusername/memochat-backend/issues"
+    "url": "https://github.com/izzethannn/memochat-backend/issues"
   },
-  "homepage": "https://github.com/yourusername/memochat-backend#readme"
+  "homepage": "https://github.com/izzethannn/memochat-backend#readme"
 }
