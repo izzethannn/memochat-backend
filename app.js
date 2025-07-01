@@ -27,18 +27,6 @@ let messageCount = 0;
 // Captcha variables
 let captchaAnswer = 0;
 
-// ===============================
-// NEW: ENHANCEMENT VARIABLES
-// ===============================
-
-// Track user activity for last seen
-let userLastActivity = new Map();
-let lastSeenInterval = null;
-
-// Keyboard shortcuts variables
-let isSpacePressed = false;
-let isSpaceMuting = false;
-
 // ENHANCED ICE SERVERS with TURN servers for better connectivity
 const ICE_SERVERS = {
     iceServers: [
@@ -93,53 +81,11 @@ function updateRoomTitle(roomName, userCount, isPasswordProtected = false) {
 }
 
 // ===============================
-// ENHANCEMENT 2: LAST SEEN INDICATOR
-// ===============================
-
-function updateUserActivity(userId) {
-    userLastActivity.set(userId, Date.now());
-}
-
-function getLastSeenText(timestamp) {
-    const now = Date.now();
-    const diff = now - timestamp;
-    
-    if (diff < 60000) return 'Active now';
-    if (diff < 300000) return `Active ${Math.floor(diff / 60000)}m ago`;
-    if (diff < 3600000) return `Active ${Math.floor(diff / 60000)}m ago`;
-    return `Active ${Math.floor(diff / 3600000)}h ago`;
-}
-
-function startLastSeenUpdates() {
-    if (lastSeenInterval) clearInterval(lastSeenInterval);
-    
-    lastSeenInterval = setInterval(() => {
-        document.querySelectorAll('.user-item').forEach(userElement => {
-            const userId = userElement.dataset.userId;
-            const statusElement = userElement.querySelector('.user-status');
-            const lastActivity = userLastActivity.get(userId);
-            
-            if (lastActivity && statusElement && !statusElement.textContent.includes('Muted') && !statusElement.textContent.includes('Sharing')) {
-                statusElement.textContent = getLastSeenText(lastActivity);
-            }
-        });
-    }, 30000); // Update every 30 seconds
-}
-
-function stopLastSeenUpdates() {
-    if (lastSeenInterval) {
-        clearInterval(lastSeenInterval);
-        lastSeenInterval = null;
-    }
-}
-
-// ===============================
-// ENHANCEMENT 3: KEYBOARD SHORTCUTS
+// ENHANCEMENT 2: KEYBOARD SHORTCUTS
 // ===============================
 
 function initializeKeyboardShortcuts() {
     document.addEventListener('keydown', handleKeyDown);
-    document.addEventListener('keyup', handleKeyUp);
     
     // Show keyboard shortcuts hint
     showToast('💡 Tip: CTRL+M to mute, CTRL+L to leave, CTRL+S for screen share', 4000);
@@ -157,33 +103,33 @@ function handleKeyDown(event) {
     }
     
     switch(event.key) {
-    case 'm':
-        // CTRL+M to toggle mute
-        if (event.ctrlKey && localStream) {
-            event.preventDefault();
-            toggleMic();
-            showToast('🎤 CTRL+M mute toggled', 1000);
-        }
-        break;
-        
-    case 'l':
-        // CTRL+L to leave room
-        if (event.ctrlKey && currentRoom) {
-            event.preventDefault();
-            if (confirm('Leave the current room?')) {
-                leaveRoom();
+        case 'm':
+            // CTRL+M to toggle mute
+            if (event.ctrlKey && localStream) {
+                event.preventDefault();
+                toggleMic();
+                showToast('🎤 CTRL+M mute toggled', 1000);
             }
-        }
-        break;
-        
-    case 's':
-        // CTRL+S for screen share
-        if (event.ctrlKey && localStream) {
-            event.preventDefault();
-            toggleScreenShare();
-        }
-        break;
-}
+            break;
+            
+        case 'l':
+            // CTRL+L to leave room
+            if (event.ctrlKey && currentRoom) {
+                event.preventDefault();
+                if (confirm('Leave the current room?')) {
+                    leaveRoom();
+                }
+            }
+            break;
+            
+        case 's':
+            // CTRL+S for screen share
+            if (event.ctrlKey && localStream) {
+                event.preventDefault();
+                toggleScreenShare();
+            }
+            break;
+    }
 }
 
 // ===============================
@@ -1362,14 +1308,6 @@ function handleRoomJoined(data) {
     
     updateUsersList(data.users);
     
-    // Track all users' activity
-    data.users.forEach(user => {
-        updateUserActivity(user.id);
-    });
-    
-    // Start last seen updates
-    startLastSeenUpdates();
-    
     // Clear chat and show message history
     clearChat();
     if (data.messages && data.messages.length > 0) {
@@ -1421,9 +1359,6 @@ function handleUserJoined(data) {
     const roomName = getCurrentRoomName();
     updateRoomTitle(roomName, currentCount, isCurrentRoomPasswordProtected());
     
-    // Track user activity
-    updateUserActivity(data.userId);
-    
     // Add user to the list
     addUserToList(data);
     
@@ -1463,9 +1398,6 @@ function handleUserLeft(data) {
     const currentCount = Math.max(1, getCurrentUserCount() - 1);
     const roomName = getCurrentRoomName();
     updateRoomTitle(roomName, currentCount, isCurrentRoomPasswordProtected());
-    
-    // Remove from activity tracking
-    userLastActivity.delete(data.userId);
     
     addChatMessage('System', `${data.username} left the room`, true);
     playNotificationSound('leave');
@@ -1815,7 +1747,7 @@ function stopScreenShare() {
     }
 }
 
-// ENHANCED Leave Room Function
+// ENHANCED Leave Room Function - FIXED FOR PROPER CLEANUP
 function leaveRoom() {
     if (currentUser && currentRoom) {
         socket.emit('leave-room', {
@@ -1827,12 +1759,31 @@ function leaveRoom() {
     playNotificationSound('leave');
     showToast('Left the room');
 
-    // Clean up streams
+    // ENHANCED CLEANUP - Clean up streams MORE thoroughly
     if (localStream) {
-        localStream.getTracks().forEach(track => track.stop());
+        localStream.getTracks().forEach(track => {
+            track.stop();
+            track.enabled = false; // EXTRA: disable tracks
+        });
         localStream = null;
     }
+    
     stopScreenShare();
+
+    // EXTRA: Reset mute state
+    isMuted = false;
+    const micBtn = document.getElementById('micBtn');
+    if (micBtn) {
+        micBtn.textContent = '🎤 Mic';
+        micBtn.className = 'btn btn-success';
+    }
+
+    // EXTRA: Reset all audio elements
+    document.querySelectorAll('audio, video').forEach(element => {
+        element.pause();
+        element.srcObject = null;
+        element.remove();
+    });
 
     // Clean up audio context
     if (audioContext) {
@@ -1844,14 +1795,10 @@ function leaveRoom() {
     // Clean up voice chat
     cleanupVoiceChat();
     
-    // Stop last seen updates
-    stopLastSeenUpdates();
-    
     // Remove keyboard shortcuts
     document.removeEventListener('keydown', handleKeyDown);
-    document.removeEventListener('keyup', handleKeyUp);
 
-    // Reset UI
+    // ENHANCED UI RESET
     document.getElementById('joinForm').style.display = 'block';
     document.getElementById('welcomeScreen').style.display = 'block';
     document.getElementById('contentArea').style.display = 'none';
@@ -1861,6 +1808,7 @@ function leaveRoom() {
     document.getElementById('screenBtn').disabled = true;
     document.getElementById('leaveBtn').disabled = true;
     document.getElementById('roomTitle').textContent = 'Welcome to MemoChat';
+    document.getElementById('roomSubtitle').textContent = 'Enter your name to get started';
     document.title = 'MemoChat - Voice & Screen Share'; // Reset page title
 
     // Hide mobile nav
@@ -2189,14 +2137,11 @@ function addUserToList(userData) {
     userItem.dataset.userId = userData.userId;
     userItem.id = `user-${userData.userId}`;
     
-    // Track user activity
-    updateUserActivity(userData.userId);
-    
     userItem.innerHTML = `
         <div class="user-avatar">${userData.username[0].toUpperCase()}</div>
         <div class="user-info">
             <div class="user-name">${userData.username}</div>
-            <div class="user-status">Active now</div>
+            <div class="user-status">Voice connected</div>
         </div>
         <div class="status-indicator status-online"></div>
     `;
@@ -2214,14 +2159,11 @@ function updateUsersList(users) {
         userItem.dataset.userId = user.id;
         userItem.id = `user-${user.id}`;
         
-        // Track user activity
-        updateUserActivity(user.id);
-        
         userItem.innerHTML = `
             <div class="user-avatar">${user.username[0].toUpperCase()}</div>
             <div class="user-info">
                 <div class="user-name">${user.username}${user.id === currentUser.id ? ' (You)' : ''}</div>
-                <div class="user-status">Active now</div>
+                <div class="user-status">Voice connected</div>
             </div>
             <div class="status-indicator status-online"></div>
         `;
