@@ -1,29 +1,33 @@
-# 📝 MemoChat v2.0
+# 📝 MemoChat v2.1
 
-A real-time voice chat and screen sharing application built with Node.js, Socket.IO, and WebRTC. Now with enhanced security, volume controls, and spam protection!
+A real-time voice chat and screen sharing application built with Node.js, Socket.IO, and WebRTC. Now with enhanced security, user authentication, volume controls, and advanced spam protection!
 
 ![MemoChat Demo](https://img.shields.io/badge/Status-Live-brightgreen)
 ![Node.js](https://img.shields.io/badge/Node.js-v18+-blue)
 ![Socket.IO](https://img.shields.io/badge/Socket.IO-v4.7-red)
+![Security](https://img.shields.io/badge/Security-Enhanced-green)
 
-## ✨ New Features in v2.0
+## ✨ New Features in v2.1
 
-### 🔐 **Password Protection**
-- Create private rooms with custom passwords
-- Secure room access with 4+ character passwords
-- Share room credentials safely with friends
+### 🔐 **Enhanced Authentication System**
+- **User Registration & Login**: Secure account creation with JWT tokens
+- **Strong Password Requirements**: 8+ characters with mixed case, numbers, and symbols
+- **Advanced Username Validation**: 3-15 characters with smart restrictions
+- **Math CAPTCHA Protection**: Dynamic anti-bot verification system
+- **Session Management**: Persistent login with token verification
+
+### 🛡️ **Advanced Security Features**
+- **Password Strength Validation**: Real-time feedback on password requirements
+- **CAPTCHA System**: Math problems prevent automated registrations
+- **Reserved Username Protection**: Blocks system/admin usernames
+- **Enhanced Input Sanitization**: Comprehensive validation for all user inputs
+- **Rate Limiting**: Multi-layer protection against abuse
 
 ### 🔊 **Volume Controls**
 - **Input Volume Slider**: Adjust your microphone sensitivity
 - **Output Volume Slider**: Control how loud you hear others
-- Real-time volume adjustment for all audio streams
-- Individual volume control for each participant
-
-### 🛡️ **Spam Protection**
-- Rate limiting: Max 20 messages per minute per user
-- Duplicate message detection
-- IP-based request limiting
-- Smart message similarity detection
+- **Real-time volume adjustment** for all audio streams
+- **Individual volume control** for each participant
 
 ### 📺 **Enhanced Screen Sharing**
 - **Full WebRTC Implementation**: Peer-to-peer screen sharing
@@ -32,15 +36,22 @@ A real-time voice chat and screen sharing application built with Node.js, Socket
 - **Multiple Screens**: Support for multiple users sharing simultaneously
 - **Visual Indicators**: Glowing borders for active screen shares
 
+### 🏠 **Room Management**
+- **Password-Protected Rooms**: Create secure private spaces
+- **Room ID System**: Custom room identifiers
+- **Copy Room Info**: Easy sharing with clipboard integration
+- **Multiple Room Types**: Gaming, Study, Music, and Private rooms
+
 ## 🎯 Core Features
 
+- 🔐 **Secure Authentication** - Registration, login, and session management
 - 🎤 **Real-time Voice Chat** - Crystal clear audio communication
 - 💬 **Text Messaging** - Instant chat with message history
 - 📺 **Screen Sharing** - Share your screen with participants
 - 🏠 **Multiple Rooms** - Gaming, Study, Music, and Private rooms
 - 👥 **User Management** - See who's online, muted, or sharing
 - 🔊 **Audio Notifications** - Sound feedback for all actions
-- 🛡️ **Security** - Rate limiting and input validation
+- 🛡️ **Advanced Security** - Multi-layer protection and validation
 - 📱 **Responsive Design** - Works on desktop and mobile
 
 ## 🚀 Quick Start
@@ -63,14 +74,25 @@ cd memochat-backend
 npm install
 ```
 
-3. **Start the server**
+3. **Configure environment** (create `.env` file)
+```env
+PORT=3001
+NODE_ENV=development
+FRONTEND_URL=http://localhost:3000
+JWT_SECRET=your-super-secret-jwt-key-here-change-in-production
+BCRYPT_ROUNDS=10
+RATE_LIMIT_MAX_REQUESTS=100
+RATE_LIMIT_WINDOW_MS=900000
+```
+
+4. **Start the server**
 ```bash
 npm start
 ```
 
-4. **Open MemoChat**
+5. **Open MemoChat**
    - Server runs on `http://localhost:3001`
-   - Open the HTML file in your browser
+   - Create an account or login
    - Allow microphone access
    - Join a room and start chatting!
 
@@ -80,18 +102,24 @@ Try the live demo: [Your Railway URL here]
 
 ## 🎯 How to Use
 
-### Basic Usage
-1. **Enter your name** in the sidebar
-2. **Choose a room type:**
-   - 🏠 **General Chat** - Open discussions
-   - 🎮 **Gaming** - For gamers
-   - 📚 **Study Group** - Quiet study sessions
-   - 🎵 **Music & Chill** - Music listening parties
-   - 🔒 **Private Room** - Basic private conversations
-   - 🔐 **Password Protected** - Secure private rooms
-3. **Click "Join Voice Chat"**
-4. **Adjust volumes** using the sliders in the sidebar
-5. **Start talking!** Use the controls to mute/unmute or share your screen
+### Getting Started
+1. **Create Account**: Register with a secure username and password
+2. **Solve CAPTCHA**: Complete the math question to verify you're human
+3. **Login**: Access your account with your credentials
+4. **Choose Room**: Select from various room types or create a private one
+
+### Account Requirements
+- **Username**: 3-15 characters, letters/numbers/underscore/hyphen only
+- **Password**: 8+ characters with uppercase, lowercase, number, and special character
+- **CAPTCHA**: Solve the math question to prevent spam
+
+### Room Types
+- 🏠 **General Chat** - Open discussions
+- 🎮 **Gaming** - For gamers
+- 📚 **Study Group** - Quiet study sessions
+- 🎵 **Music & Chill** - Music listening parties
+- 🔒 **Private Room** - Basic private conversations
+- 🔐 **Password Protected** - Secure private rooms with custom passwords
 
 ### Creating Password-Protected Rooms
 1. **Select "Password Protected"** from the room dropdown
@@ -100,12 +128,6 @@ Try the live demo: [Your Railway URL here]
 4. **Click "Create Room"**
 5. **Share the Room ID and Password** with friends
 6. **Copy room info** using the copy button for easy sharing
-
-### Joining Password-Protected Rooms
-1. **Select "Password Protected"** from the room dropdown
-2. **Enter the Room ID** in the custom room field
-3. **Enter the password** provided by the room creator
-4. **Click "Join Protected Room"**
 
 ### Volume Controls
 - **Input Volume**: Controls your microphone sensitivity (visual indicator)
@@ -122,19 +144,24 @@ Try the live demo: [Your Railway URL here]
 ## 🛠️ Tech Stack
 
 - **Backend:** Node.js, Express.js
+- **Authentication:** JWT, bcrypt
 - **Real-time:** Socket.IO
 - **Voice/Video:** WebRTC with STUN servers
-- **Security:** Helmet, CORS, Rate Limiting, Password Protection
+- **Security:** Helmet, CORS, Rate Limiting, CAPTCHA, Password Protection
 - **Frontend:** HTML5, CSS3, Vanilla JavaScript
 - **Audio Processing:** Web Audio API
 
 ## 📡 API Endpoints
 
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/api/health` | GET | Server health check |
-| `/api/rooms` | GET | List all active rooms (with protection status) |
-| `/api/room/:name` | GET | Get specific room info |
+| Endpoint | Method | Description | Auth Required |
+|----------|--------|-------------|---------------|
+| `/api/auth/register` | POST | Create new user account | No |
+| `/api/auth/login` | POST | Login to existing account | No |
+| `/api/auth/verify` | POST | Verify JWT token | Yes |
+| `/api/auth/logout` | POST | Logout and invalidate token | Yes |
+| `/api/health` | GET | Server health check | No |
+| `/api/rooms` | GET | List all active rooms | No |
+| `/api/room/:name` | GET | Get specific room info | No |
 
 ## 🔌 Socket Events
 
@@ -155,48 +182,75 @@ Try the live demo: [Your Railway URL here]
 - `user-status-update` - Status changes
 - `user-screen-share-start/stop` - Screen sharing notifications
 
-## 🔧 Configuration
-
-Create a `.env` file:
-
-```env
-PORT=3001
-NODE_ENV=development
-FRONTEND_URL=http://localhost:3000
-RATE_LIMIT_MAX_REQUESTS=100
-RATE_LIMIT_WINDOW_MS=900000
-```
-
 ## 🛡️ Security Features
+
+### Authentication & Authorization
+- **JWT Tokens**: Secure session management with 24-hour expiry
+- **Password Hashing**: bcrypt with configurable salt rounds
+- **Token Verification**: Server-side validation for all authenticated requests
+- **Session Cleanup**: Automatic cleanup of expired sessions
+
+### Password Security
+- **Strength Requirements**: 8+ characters with mixed complexity
+- **Real-time Validation**: Instant feedback on password strength
+- **Secure Storage**: Hashed passwords with salt
+- **No Password Exposure**: Passwords never logged or transmitted in plain text
+
+### CAPTCHA Protection
+- **Dynamic Math Problems**: Addition, subtraction, multiplication
+- **Auto-refresh**: New questions generated on errors
+- **Visual Feedback**: Clear success/failure indicators
+- **Spam Prevention**: Blocks automated registration attempts
+
+### Username Validation
+- **Length Requirements**: 3-15 characters enforced
+- **Character Restrictions**: Alphanumeric + underscore/hyphen only
+- **Reserved Words**: Blocks admin, system, root, etc.
+- **Format Rules**: Cannot be all numbers or start with numbers
 
 ### Rate Limiting
 - **API Requests**: 100 requests per 15 minutes per IP
+- **Authentication**: 5 auth attempts per 15 minutes per IP
 - **Chat Messages**: 20 messages per minute per user
-- **Connection Attempts**: Limited by IP
+- **Connection Attempts**: Limited by IP address
 
 ### Spam Protection
 - **Message Frequency**: Prevents rapid message sending
 - **Duplicate Detection**: Flags repetitive messages
 - **Content Filtering**: Basic content sanitization
 - **User Throttling**: Temporary restrictions for spammers
+- **Similarity Detection**: Advanced duplicate message detection
 
-### Password Protection
-- **Minimum Length**: 4 characters required
+### Room Security
+- **Password Protection**: Minimum 4 characters for private rooms
 - **Room Isolation**: Password-protected rooms are isolated
-- **Secure Transmission**: Passwords sent over secure connections
+- **Secure Transmission**: All data encrypted in transit
+- **Access Control**: Users must authenticate to join protected rooms
 
 ## 🚢 Deployment
 
 ### Railway (Recommended)
 1. Connect your GitHub repository
-2. Set environment variables
+2. Set environment variables including `JWT_SECRET`
 3. Deploy automatically
 4. Get your live URL
 
+### Environment Variables for Production
+```env
+PORT=3001
+NODE_ENV=production
+FRONTEND_URL=https://your-domain.com
+JWT_SECRET=your-super-secure-jwt-secret-minimum-32-characters-long
+BCRYPT_ROUNDS=12
+RATE_LIMIT_MAX_REQUESTS=100
+RATE_LIMIT_WINDOW_MS=900000
+```
+
 ### Other Platforms
-- **Render:** Free tier available
-- **Heroku:** Paid hosting
+- **Render:** Free tier available with persistent storage
+- **Heroku:** Paid hosting with add-ons
 - **Google Cloud:** Student credits available
+- **DigitalOcean:** App platform deployment
 
 ## 🧪 Testing
 
@@ -207,14 +261,20 @@ node test_server.js
 # Run with development auto-restart
 npm run dev
 
-# Test volume controls
-# - Join a room and adjust sliders
-# - Verify audio level changes
+# Test authentication system
+# - Create new account with various passwords
+# - Test CAPTCHA functionality
+# - Verify token persistence
 
-# Test password protection
-# - Create a private room
+# Test security features
+# - Try weak passwords (should fail)
+# - Test reserved usernames (should fail)
+# - Attempt rapid message sending (should throttle)
+
+# Test room functionality
+# - Create password-protected rooms
 # - Try joining with wrong password
-# - Verify access control
+# - Verify access control works
 ```
 
 ## 🤝 Contributing
@@ -233,44 +293,51 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 - Input volume slider is visual only (Web Audio API needed for real-time gain control)
 - Mobile browser screen sharing support varies
-- Password rooms persist until server restart
+- Password rooms persist until server restart (database integration planned)
 
 ## 🔮 Future Features
 
+- [ ] **Database Integration** for persistent user accounts and rooms
 - [ ] **Real Input Volume Control** using Web Audio API
 - [ ] **User Profiles** with avatars and preferences
-- [ ] **Room Persistence** with database storage
-- [ ] **File Sharing** in chat
-- [ ] **Voice Recording** and playback
+- [ ] **Friend System** and private messaging
+- [ ] **File Sharing** in chat with security scanning
+- [ ] **Voice Recording** and playback features
 - [ ] **Mobile App** (React Native)
 - [ ] **End-to-end Encryption** for private rooms
-- [ ] **Admin Controls** for room management
+- [ ] **Admin Panel** for user and room management
 - [ ] **Custom Themes** and UI customization
+- [ ] **Two-Factor Authentication** for enhanced security
+- [ ] **Audit Logs** for security monitoring
 
-## 🆕 Version 2.0 Changelog
+## 🆕 Version 2.1 Changelog
 
-### Added
-- 🔐 Password-protected private rooms
-- 🔊 Input/Output volume sliders
-- 🛡️ Advanced spam protection
-- 📺 Full WebRTC screen sharing implementation
-- 🎨 Enhanced UI with volume controls
-- 📋 Room info copy functionality
-- 🔔 Improved error messaging
-- 📱 Better mobile responsiveness
+### 🔐 Security Enhancements Added
+- **User Authentication System**: Complete registration and login flow
+- **JWT Token Management**: Secure session handling with auto-expiry
+- **Enhanced Password Validation**: 8+ character requirements with complexity rules
+- **Math CAPTCHA System**: Dynamic anti-bot protection
+- **Advanced Username Validation**: Comprehensive rules and reserved word protection
+- **Session Persistence**: Users stay logged in across browser sessions
 
-### Improved
-- 🚀 Better WebRTC connection handling
-- 🎯 More robust error handling
-- 🛡️ Enhanced security measures
-- 📊 Better rate limiting
-- 🎨 Updated visual design
+### 🎨 UI/UX Improvements
+- **Enhanced Login Screen**: Professional authentication interface
+- **Real-time Validation**: Instant feedback on form inputs
+- **CAPTCHA Integration**: Seamless math problem verification
+- **Better Error Messages**: Clear, specific validation feedback
+- **Security Indicators**: Visual feedback for password strength
 
-### Fixed
-- 🐛 Screen sharing connection issues
-- 🔧 Mobile view navigation
-- 📱 Responsive design improvements
-- 🔊 Audio element management
+### 🛡️ Security Hardening
+- **Rate Limiting Enhancement**: Multiple layers of protection
+- **Input Sanitization**: Advanced validation for all user inputs
+- **Token Verification**: Server-side authentication for all operations
+- **Session Security**: Automatic cleanup and token management
+
+### 🐛 Bug Fixes from v2.0
+- **Screen sharing connection stability** improved
+- **Mobile responsive design** enhanced
+- **Audio element management** optimized
+- **WebRTC connection handling** more robust
 
 ## 📞 Support
 
@@ -279,32 +346,58 @@ Having issues?
 - Create a new issue with details
 - Join our [Discord](https://discord.gg/your-link) for community support
 
+## 🔒 Security Disclosure
+
+If you discover a security vulnerability, please send an email to [security@yourproject.com]. All security vulnerabilities will be promptly addressed.
+
 ## 🙏 Acknowledgments
 
 - Socket.IO team for real-time capabilities
 - WebRTC community for voice/video foundations
 - Railway for easy deployment
+- JWT.io for authentication standards
+- bcrypt team for secure password hashing
 - All contributors and testers
-- Beta testers who provided feedback on v2.0 features
+- Security researchers who provided feedback
 
 ---
 
-**Made with ❤️ for seamless communication**
+**Made with ❤️ for secure, seamless communication**
 
-⭐ **Star this repo if you found the new features helpful!** ⭐
+⭐ **Star this repo if you found the enhanced security features helpful!** ⭐
 
-## 🚀 Upgrade from v1.0
+## 🚀 Upgrade from v2.0
 
-If you're upgrading from v1.0:
+If you're upgrading from v2.0 to v2.1:
 
-1. **Update dependencies**: `npm install`
-2. **New environment variables**: Check `.env` example
-3. **Database changes**: Room structure updated for passwords
-4. **Frontend changes**: New UI elements and controls
-5. **API changes**: New endpoints for room creation
+### Required Changes
+1. **Update app.js**: Replace with the new enhanced version
+2. **Environment Variables**: Add `JWT_SECRET` and `BCRYPT_ROUNDS`
+3. **Database Preparation**: Consider adding persistent storage for users
+4. **Frontend Updates**: HTML includes new login screen and CAPTCHA elements
 
-### Migration Notes
-- Existing rooms will work without passwords
-- Volume controls are automatically enabled
-- Spam protection is enabled by default
-- Screen sharing now uses peer-to-peer connections
+### Migration Steps
+```bash
+# 1. Backup your current version
+cp app.js app.js.backup
+
+# 2. Update app.js with new enhanced version
+# 3. Update environment variables
+echo "JWT_SECRET=your-32-character-secret-key-here" >> .env
+echo "BCRYPT_ROUNDS=10" >> .env
+
+# 4. Restart server
+npm restart
+```
+
+### New User Experience
+- Users will see a login screen on first visit
+- Registration requires username/password + CAPTCHA
+- Existing anonymous sessions will need to create accounts
+- All features remain the same after authentication
+
+### Compatibility Notes
+- Existing rooms will continue to work
+- Volume controls and screen sharing unchanged
+- New authentication layer is required for access
+- Mobile experience improved with responsive login
