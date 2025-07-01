@@ -1,7 +1,7 @@
 {
   "name": "memochat-backend",
-  "version": "2.0.0",
-  "description": "Enhanced Backend server for MemoChat - Voice & Screen Share application with volume controls, password protection, and spam protection",
+  "version": "2.1.0",
+  "description": "Enhanced Backend server for MemoChat - Voice & Screen Share application with authentication, volume controls, password protection, and spam protection",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
@@ -20,9 +20,13 @@
     "real-time",
     "memo",
     "chat",
+    "authentication",
+    "jwt",
+    "login",
     "password-protection",
     "volume-control",
-    "spam-protection"
+    "spam-protection",
+    "bcrypt"
   ],
   "author": "MemoChat Team",
   "license": "MIT",
@@ -34,7 +38,8 @@
     "express-rate-limit": "^7.1.5",
     "uuid": "^9.0.1",
     "dotenv": "^16.3.1",
-    "bcrypt": "^5.1.1"
+    "bcrypt": "^5.1.1",
+    "jsonwebtoken": "^9.0.2"
   },
   "devDependencies": {
     "nodemon": "^3.0.2",
