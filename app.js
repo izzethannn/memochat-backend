@@ -1,5 +1,5 @@
 // Global variables
-const BACKEND_URL = 'https://memochat-backend-production.up.railway.app'; // UPDATE THIS!
+const BACKEND_URL = 'https://memochat-backend-production.up.railway.app'; 
 let localStream = null;
 let screenStream = null;
 let socket = null;
