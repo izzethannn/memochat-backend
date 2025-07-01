@@ -101,26 +101,38 @@
 <body>
     <!-- Login Screen -->
     <div class="login-screen" id="loginScreen">
-        <div class="login-container">
-            <h1>📝 MemoChat</h1>
-            <p>Secure voice chat with enhanced features</p>
+    <div class="login-container">
+        <h1>📝 MemoChat</h1>
+        <p>Secure voice chat with enhanced features</p>
+        
+        <div class="login-form">
+            <input type="text" id="loginUsername" placeholder="Username (3-15 characters)" maxlength="15" autocomplete="username">
+            <input type="password" id="loginPassword" placeholder="Password (8+ chars, mixed case, number, symbol)" maxlength="50" autocomplete="current-password">
             
-            <div class="login-form">
-                <input type="text" id="loginUsername" placeholder="Username (min 3 characters)" maxlength="20" autocomplete="username">
-                <input type="password" id="loginPassword" placeholder="Password (min 6 characters)" maxlength="50" autocomplete="current-password">
-                
-                <div class="login-buttons">
-                    <button class="btn btn-primary" id="loginBtn" onclick="handleLogin()">Login</button>
-                    <button class="btn btn-success" id="registerBtn" onclick="handleRegister()">Create Account</button>
+            <!-- CAPTCHA Section -->
+            <div class="captcha-section">
+                <label for="captchaAnswer" style="color: rgba(255, 255, 255, 0.9); font-size: 14px; margin-bottom: 8px; display: block;">
+                    🔢 Anti-spam: What is <span id="captchaQuestion">5 + 3</span>?
+                </label>
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <input type="number" id="captchaAnswer" placeholder="Answer" style="flex: 1;" required>
+                    <button type="button" onclick="refreshCaptcha()" class="btn btn-primary" style="padding: 15px 12px; font-size: 14px; min-width: auto;">🔄</button>
                 </div>
             </div>
             
-            <p style="margin-top: 20px; font-size: 12px; opacity: 0.7;">
-                New users: Create an account to get started<br>
-                Existing users: Login with your credentials
-            </p>
+            <div class="login-buttons">
+                <button class="btn btn-primary" id="loginBtn" onclick="handleLogin()">Login</button>
+                <button class="btn btn-success" id="registerBtn" onclick="handleRegister()">Create Account</button>
+            </div>
+        </div>
+        
+        <div style="margin-top: 20px; font-size: 12px; opacity: 0.7;">
+            <p><strong>New users:</strong> Create an account to get started</p>
+            <p><strong>Password requirements:</strong> 8+ characters, mixed case, number, symbol</p>
+            <p><strong>Username rules:</strong> 3-15 characters, letters/numbers/underscore/hyphen only</p>
         </div>
     </div>
+</div>
 
     <!-- Main Application -->
     <div class="container" id="mainApp" style="display: none;">
