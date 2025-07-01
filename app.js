@@ -11,6 +11,9 @@ let isInVoiceChat = false;
 let inputVolumeLevel = 100;
 let outputVolumeLevel = 100;
 let createdRoomInfo = null;
+let audioContext = null;
+let gainNode = null;
+let isLoggedIn = false;
 
 // WebRTC variables for group voice chat
 let peerConnections = {};
@@ -49,6 +52,241 @@ const ICE_SERVERS = {
     ],
     iceCandidatePoolSize: 10
 };
+
+// Login System Functions
+function showLoginForm() {
+    document.getElementById('loginScreen').style.display = 'flex';
+    document.getElementById('mainApp').style.display = 'none';
+}
+
+function showMainApp() {
+    document.getElementById('loginScreen').style.display = 'none';
+    document.getElementById('mainApp').style.display = 'flex';
+}
+
+async function handleLogin() {
+    const username = document.getElementById('loginUsername').value.trim();
+    const password = document.getElementById('loginPassword').value.trim();
+
+    if (!username || !password) {
+        showToast('Please enter both username and password');
+        return;
+    }
+
+    if (username.length < 3) {
+        showToast('Username must be at least 3 characters');
+        return;
+    }
+
+    if (password.length < 6) {
+        showToast('Password must be at least 6 characters');
+        return;
+    }
+
+    try {
+        // Show loading state
+        const loginBtn = document.getElementById('loginBtn');
+        const originalText = loginBtn.textContent;
+        loginBtn.textContent = 'Logging in...';
+        loginBtn.disabled = true;
+
+        // Send login request to server
+        const response = await fetch('/api/auth/login', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ username, password })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            // Store auth token
+            localStorage.setItem('authToken', data.token);
+            localStorage.setItem('username', username);
+            
+            isLoggedIn = true;
+            currentUser = {
+                id: data.userId,
+                name: username,
+                token: data.token
+            };
+
+            // Pre-fill username in main form
+            document.getElementById('usernameInput').value = username;
+            
+            showMainApp();
+            showToast('Login successful!');
+            
+            // Initialize socket connection after login
+            await initializeApp();
+        } else {
+            showToast(data.message || 'Login failed');
+        }
+    } catch (error) {
+        console.error('Login error:', error);
+        showToast('Login failed. Please try again.');
+    } finally {
+        // Reset button state
+        const loginBtn = document.getElementById('loginBtn');
+        loginBtn.textContent = 'Login';
+        loginBtn.disabled = false;
+    }
+}
+
+async function handleRegister() {
+    const username = document.getElementById('loginUsername').value.trim();
+    const password = document.getElementById('loginPassword').value.trim();
+
+    if (!username || !password) {
+        showToast('Please enter both username and password');
+        return;
+    }
+
+    if (username.length < 3) {
+        showToast('Username must be at least 3 characters');
+        return;
+    }
+
+    if (password.length < 6) {
+        showToast('Password must be at least 6 characters');
+        return;
+    }
+
+    try {
+        // Show loading state
+        const registerBtn = document.getElementById('registerBtn');
+        const originalText = registerBtn.textContent;
+        registerBtn.textContent = 'Creating account...';
+        registerBtn.disabled = true;
+
+        // Send register request to server
+        const response = await fetch('/api/auth/register', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ username, password })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            showToast('Account created successfully! Please login.');
+            // Auto-login after successful registration
+            setTimeout(() => handleLogin(), 1000);
+        } else {
+            showToast(data.message || 'Registration failed');
+        }
+    } catch (error) {
+        console.error('Registration error:', error);
+        showToast('Registration failed. Please try again.');
+    } finally {
+        // Reset button state
+        const registerBtn = document.getElementById('registerBtn');
+        registerBtn.textContent = 'Create Account';
+        registerBtn.disabled = false;
+    }
+}
+
+function logout() {
+    localStorage.removeItem('authToken');
+    localStorage.removeItem('username');
+    isLoggedIn = false;
+    
+    // Clean up current session
+    if (currentRoom) {
+        leaveRoom();
+    }
+    
+    // Disconnect socket
+    if (socket) {
+        socket.disconnect();
+    }
+    
+    currentUser = null;
+    showLoginForm();
+    showToast('Logged out successfully');
+}
+
+// Check if user is already logged in
+function checkAuthStatus() {
+    const token = localStorage.getItem('authToken');
+    const username = localStorage.getItem('username');
+    
+    if (token && username) {
+        // Verify token with server
+        fetch('/api/auth/verify', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.valid) {
+                isLoggedIn = true;
+                currentUser = {
+                    id: data.userId,
+                    name: username,
+                    token: token
+                };
+                document.getElementById('usernameInput').value = username;
+                showMainApp();
+                initializeApp();
+            } else {
+                localStorage.removeItem('authToken');
+                localStorage.removeItem('username');
+                showLoginForm();
+            }
+        })
+        .catch(() => {
+            localStorage.removeItem('authToken');
+            localStorage.removeItem('username');
+            showLoginForm();
+        });
+    } else {
+        showLoginForm();
+    }
+}
+
+// FIXED: Initialize Web Audio Context for input volume control
+async function initializeAudioContext() {
+    try {
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        
+        if (localStream) {
+            const source = audioContext.createMediaStreamSource(localStream);
+            gainNode = audioContext.createGain();
+            const destination = audioContext.createMediaStreamDestination();
+            
+            source.connect(gainNode);
+            gainNode.connect(destination);
+            
+            // Replace the original stream with the processed one
+            const audioTrack = destination.stream.getAudioTracks()[0];
+            const videoTracks = localStream.getVideoTracks();
+            
+            // Create new stream with processed audio
+            const processedStream = new MediaStream([audioTrack, ...videoTracks]);
+            
+            // Update all peer connections with the new stream
+            Object.values(peerConnections).forEach(pc => {
+                const sender = pc.getSenders().find(s => s.track && s.track.kind === 'audio');
+                if (sender) {
+                    sender.replaceTrack(audioTrack);
+                }
+            });
+            
+            localStream = processedStream;
+            console.log('✅ Audio context initialized for input volume control');
+        }
+    } catch (error) {
+        console.warn('⚠️ Could not initialize audio context:', error);
+    }
+}
 
 // Helper function to process queued ICE candidates
 async function processQueuedCandidates(peerConnection, senderId, isScreenShare) {
@@ -212,7 +450,8 @@ async function handleWebRTCOffer(data) {
             
             if (isScreenShare) {
                 console.log('🖥️ Displaying remote screen share');
-                addScreenShareElement(`screen-${callerId}`, `${callerName}'s Screen`, remoteStream);
+                // FIXED: Use unique IDs to prevent conflicts
+                addScreenShareElement(`screen-${callerId}-${Date.now()}`, `${callerName}'s Screen`, remoteStream);
                 
                 // Verify the stream has video
                 const videoTracks = remoteStream.getVideoTracks();
@@ -333,9 +572,11 @@ function cleanupPeerConnection(peerConnection, userId, isScreenShare) {
             delete peerConnection.pendingIceCandidates;
         }
         
-        // Remove from UI
+        // FIXED: Only remove specific screen share elements, not all
         if (isScreenShare) {
-            removeScreenShareElement(`screen-${userId}`);
+            // Remove all screen share elements for this user
+            const elements = document.querySelectorAll(`[id^="video-screen-${userId}"]`);
+            elements.forEach(el => el.remove());
         } else {
             removeVoiceElement(userId);
         }
@@ -511,16 +752,17 @@ function copyRoomInfo() {
     }
 }
 
-// Volume controls
+// FIXED: Volume controls with Web Audio API
 function updateInputVolume(value) {
     inputVolumeLevel = value;
     document.getElementById('inputVolumeValue').textContent = value + '%';
     
-    if (localStream) {
-        const audioTrack = localStream.getAudioTracks()[0];
-        if (audioTrack) {
-            console.log(`Input volume set to ${value}%`);
-        }
+    // Apply gain to the audio context if available
+    if (gainNode) {
+        gainNode.gain.setValueAtTime(value / 100, audioContext.currentTime);
+        console.log(`🎤 Input volume set to ${value}%`);
+    } else {
+        console.log(`🎤 Input volume display set to ${value}% (Web Audio not available)`);
     }
 }
 
@@ -533,6 +775,8 @@ function updateOutputVolume(value) {
     audioElements.forEach(element => {
         element.volume = value / 100;
     });
+    
+    console.log(`🔊 Output volume set to ${value}%`);
 }
 
 // Mobile view management
@@ -615,14 +859,22 @@ function updateConnectionStatus(status) {
 
 // Initialize app and socket connection
 async function initializeApp() {
-    // Connect to the backend server
+    if (!isLoggedIn) {
+        console.log('User not logged in, skipping socket initialization');
+        return;
+    }
+
+    // Connect to the backend server with auth token
     socket = io('https://memochat-backend-production.up.railway.app', {
         transports: ['websocket', 'polling'],
         timeout: 20000,
         forceNew: true,
         reconnection: true,
         reconnectionAttempts: 5,
-        reconnectionDelay: 1000
+        reconnectionDelay: 1000,
+        auth: {
+            token: currentUser.token
+        }
     });
     
     // Connection event handlers
@@ -735,11 +987,11 @@ async function joinRoom() {
             video: false 
         });
 
-        currentUser = {
-            id: generateId(),
-            name: username,
-            room: finalRoom
-        };
+        // Initialize audio context for input volume control
+        await initializeAudioContext();
+
+        // Update current user info
+        currentUser.room = finalRoom;
         currentRoom = finalRoom;
 
         socket.emit('join-room', {
@@ -881,7 +1133,9 @@ function handleUserScreenShareStart(data) {
 function handleUserScreenShareStop(data) {
     console.log(`${data.username} stopped screen sharing`);
     showToast(`${data.username} stopped sharing`);
-    removeScreenShareElement(`screen-${data.userId}`);
+    // FIXED: Only remove screen shares from the specific user
+    const elements = document.querySelectorAll(`[id^="video-screen-${data.userId}"]`);
+    elements.forEach(el => el.remove());
 }
 
 // WebRTC Voice Chat Functions
@@ -1178,7 +1432,7 @@ function stopScreenShare() {
         cleanupPeerConnection(screenPeerConnections[userId], userId, true);
     });
     
-    // Remove UI elements
+    // Remove UI elements - FIXED: Only remove your own screen share
     removeScreenShareElement('screen-local');
     
     // Reset button
@@ -1218,6 +1472,13 @@ function leaveRoom() {
     }
     stopScreenShare();
 
+    // Clean up audio context
+    if (audioContext) {
+        audioContext.close();
+        audioContext = null;
+        gainNode = null;
+    }
+
     // Clean up voice chat
     cleanupVoiceChat();
 
@@ -1248,14 +1509,13 @@ function leaveRoom() {
     clearChat();
     updateConnectionStatus('connected');
 
-    currentUser = null;
     currentRoom = null;
 }
 
 // Audio feedback system
 function playNotificationSound(type) {
     try {
-        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        const tempAudioContext = new (window.AudioContext || window.webkitAudioContext)();
         
         const frequencies = {
             'join': [440, 554, 659],
@@ -1273,21 +1533,21 @@ function playNotificationSound(type) {
         
         freqs.forEach((freq, index) => {
             setTimeout(() => {
-                const oscillator = audioContext.createOscillator();
-                const gainNode = audioContext.createGain();
+                const oscillator = tempAudioContext.createOscillator();
+                const gainNode = tempAudioContext.createGain();
                 
                 oscillator.connect(gainNode);
-                gainNode.connect(audioContext.destination);
+                gainNode.connect(tempAudioContext.destination);
                 
-                oscillator.frequency.setValueAtTime(freq, audioContext.currentTime);
+                oscillator.frequency.setValueAtTime(freq, tempAudioContext.currentTime);
                 oscillator.type = 'sine';
                 
-                gainNode.gain.setValueAtTime(0, audioContext.currentTime);
-                gainNode.gain.linearRampToValueAtTime(0.1, audioContext.currentTime + 0.01);
-                gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.2);
+                gainNode.gain.setValueAtTime(0, tempAudioContext.currentTime);
+                gainNode.gain.linearRampToValueAtTime(0.1, tempAudioContext.currentTime + 0.01);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, tempAudioContext.currentTime + 0.2);
                 
-                oscillator.start(audioContext.currentTime);
-                oscillator.stop(audioContext.currentTime + 0.2);
+                oscillator.start(tempAudioContext.currentTime);
+                oscillator.stop(tempAudioContext.currentTime + 0.2);
             }, index * 100);
         });
     } catch (error) {
@@ -1629,6 +1889,9 @@ function debugConnections() {
     console.log('Connected users:', Array.from(connectedUsers));
     console.log('Is screen sharing:', isScreenSharing);
     console.log('Screen stream:', screenStream);
+    console.log('Current user:', currentUser);
+    console.log('Audio context:', audioContext);
+    console.log('Gain node:', gainNode);
     
     // Check connection states
     Object.entries(peerConnections).forEach(([userId, pc]) => {
@@ -1684,16 +1947,21 @@ function startConnectionHealthMonitoring() {
 
 // Event Listeners
 document.addEventListener('DOMContentLoaded', () => {
-    initializeApp();
+    checkAuthStatus();
     startConnectionHealthMonitoring();
 });
 
 // Handle enter key in inputs
-document.getElementById('usernameInput').addEventListener('keypress', function(e) {
-    if (e.key === 'Enter') joinRoom();
-});
-
 document.addEventListener('keypress', function(e) {
+    if (e.target.id === 'loginUsername' && e.key === 'Enter') {
+        handleLogin();
+    }
+    if (e.target.id === 'loginPassword' && e.key === 'Enter') {
+        handleLogin();
+    }
+    if (e.target.id === 'usernameInput' && e.key === 'Enter') {
+        joinRoom();
+    }
     if (e.target.id === 'chatInput' && e.key === 'Enter') {
         sendMessage();
     }
@@ -1713,10 +1981,14 @@ window.addEventListener('resize', function() {
     if (window.innerWidth > 767) {
         document.getElementById('sidebar').classList.remove('hidden');
         document.getElementById('mainContent').classList.remove('mobile-active');
-        document.getElementById('mobileNav').style.display = 'none';
+        if (document.getElementById('mobileNav')) {
+            document.getElementById('mobileNav').style.display = 'none';
+        }
         isMobileView = false;
-    } else if (currentUser) {
-        document.getElementById('mobileNav').style.display = 'block';
+    } else if (currentUser && currentRoom) {
+        if (document.getElementById('mobileNav')) {
+            document.getElementById('mobileNav').style.display = 'block';
+        }
         if (!isMobileView) {
             document.getElementById('sidebar').classList.add('hidden');
             document.getElementById('mainContent').classList.add('mobile-active');
