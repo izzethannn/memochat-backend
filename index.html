@@ -6,9 +6,127 @@
     <title>MemoChat - Voice & Screen Share</title>
     <script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
     <link rel="stylesheet" href="styles.css">
+    <style>
+        /* Login Screen Styles */
+        .login-screen {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+        }
+
+        .login-container {
+            background: rgba(0, 0, 0, 0.3);
+            backdrop-filter: blur(10px);
+            padding: 40px;
+            border-radius: 15px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            width: 100%;
+            max-width: 400px;
+            text-align: center;
+        }
+
+        .login-container h1 {
+            color: white;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+
+        .login-container p {
+            color: rgba(255, 255, 255, 0.8);
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+
+        .login-form {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .login-form input {
+            padding: 15px;
+            border: none;
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            font-size: 16px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            transition: all 0.3s ease;
+        }
+
+        .login-form input:focus {
+            outline: none;
+            background: rgba(255, 255, 255, 0.15);
+            border-color: #7289da;
+        }
+
+        .login-form input::placeholder {
+            color: rgba(255, 255, 255, 0.6);
+        }
+
+        .login-buttons {
+            display: flex;
+            gap: 10px;
+            flex-direction: column;
+        }
+
+        .login-buttons .btn {
+            padding: 15px;
+            font-size: 16px;
+            font-weight: 600;
+        }
+
+        .logout-btn {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1001;
+        }
+
+        @media (max-width: 768px) {
+            .login-container {
+                padding: 30px 20px;
+            }
+            
+            .logout-btn {
+                top: 10px;
+                right: 10px;
+            }
+        }
+    </style>
 </head>
 <body>
-    <div class="container">
+    <!-- Login Screen -->
+    <div class="login-screen" id="loginScreen">
+        <div class="login-container">
+            <h1>📝 MemoChat</h1>
+            <p>Secure voice chat with enhanced features</p>
+            
+            <div class="login-form">
+                <input type="text" id="loginUsername" placeholder="Username (min 3 characters)" maxlength="20" autocomplete="username">
+                <input type="password" id="loginPassword" placeholder="Password (min 6 characters)" maxlength="50" autocomplete="current-password">
+                
+                <div class="login-buttons">
+                    <button class="btn btn-primary" id="loginBtn" onclick="handleLogin()">Login</button>
+                    <button class="btn btn-success" id="registerBtn" onclick="handleRegister()">Create Account</button>
+                </div>
+            </div>
+            
+            <p style="margin-top: 20px; font-size: 12px; opacity: 0.7;">
+                New users: Create an account to get started<br>
+                Existing users: Login with your credentials
+            </p>
+        </div>
+    </div>
+
+    <!-- Main Application -->
+    <div class="container" id="mainApp" style="display: none;">
+        <!-- Logout Button -->
+        <button class="btn btn-danger logout-btn" onclick="logout()">🚪 Logout</button>
+
         <div class="sidebar" id="sidebar">
             <div class="room-info">
                 <h2>📝 MemoChat</h2>
@@ -16,7 +134,7 @@
             </div>
 
             <div class="join-form" id="joinForm">
-                <input type="text" id="usernameInput" placeholder="Enter your name" maxlength="20">
+                <input type="text" id="usernameInput" placeholder="Enter your name" maxlength="20" readonly>
                 <select id="roomSelect" onchange="handleRoomChange()">
                     <option value="">Choose a room...</option>
                     <option value="general">🏠 General Chat</option>
