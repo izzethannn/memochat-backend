@@ -24,6 +24,9 @@ let connectedUsers = new Set();
 let lastMessageTime = 0;
 let messageCount = 0;
 
+// Captcha variables
+let captchaAnswer = 0;
+
 // ENHANCED ICE SERVERS with TURN servers for better connectivity
 const ICE_SERVERS = {
     iceServers: [
@@ -54,7 +57,131 @@ const ICE_SERVERS = {
     iceCandidatePoolSize: 10
 };
 
-// Login System Functions
+// ===============================
+// ENHANCED VALIDATION FUNCTIONS
+// ===============================
+
+// 1. STRONGER PASSWORD VALIDATION
+function validatePassword(password) {
+    const errors = [];
+    
+    if (password.length < 8) {
+        errors.push("at least 8 characters");
+    }
+    
+    if (!/[A-Z]/.test(password)) {
+        errors.push("one uppercase letter");
+    }
+    
+    if (!/[a-z]/.test(password)) {
+        errors.push("one lowercase letter");
+    }
+    
+    if (!/\d/.test(password)) {
+        errors.push("one number");
+    }
+    
+    if (!/[!@#$%^&*(),.?":{}|<>-_]/.test(password)) {
+        errors.push("one special character (!@#$%^&* etc.)");
+    }
+    
+    if (errors.length > 0) {
+        return `Password must contain: ${errors.join(", ")}`;
+    }
+    
+    return null; // Valid password
+}
+
+// 2. MATH CAPTCHA SYSTEM
+function generateCaptcha() {
+    const num1 = Math.floor(Math.random() * 10) + 1; // 1-10
+    const num2 = Math.floor(Math.random() * 10) + 1; // 1-10
+    const operations = ['+', '-', '*'];
+    const operation = operations[Math.floor(Math.random() * operations.length)];
+    
+    let question, answer;
+    
+    switch(operation) {
+        case '+':
+            question = `${num1} + ${num2}`;
+            answer = num1 + num2;
+            break;
+        case '-':
+            // Ensure positive result
+            const larger = Math.max(num1, num2);
+            const smaller = Math.min(num1, num2);
+            question = `${larger} - ${smaller}`;
+            answer = larger - smaller;
+            break;
+        case '*':
+            // Use smaller numbers for multiplication
+            const small1 = Math.floor(Math.random() * 5) + 1; // 1-5
+            const small2 = Math.floor(Math.random() * 5) + 1; // 1-5
+            question = `${small1} × ${small2}`;
+            answer = small1 * small2;
+            break;
+    }
+    
+    captchaAnswer = answer;
+    const captchaElement = document.getElementById('captchaQuestion');
+    if (captchaElement) {
+        captchaElement.textContent = question;
+    }
+    const answerElement = document.getElementById('captchaAnswer');
+    if (answerElement) {
+        answerElement.value = '';
+    }
+}
+
+function validateCaptcha() {
+    const captchaAnswerElement = document.getElementById('captchaAnswer');
+    if (!captchaAnswerElement) return false;
+    
+    const userAnswer = parseInt(captchaAnswerElement.value);
+    return userAnswer === captchaAnswer;
+}
+
+// 3. BETTER USERNAME VALIDATION
+function validateUsername(username) {
+    // Check length
+    if (username.length < 3 || username.length > 15) {
+        return "Username must be 3-15 characters long";
+    }
+    
+    // Check valid characters (letters, numbers, underscore, hyphen only)
+    if (!/^[a-zA-Z0-9_-]+$/.test(username)) {
+        return "Username can only contain letters, numbers, underscore (_) and hyphen (-)";
+    }
+    
+    // Cannot be all numbers
+    if (/^[0-9]+$/.test(username)) {
+        return "Username cannot be all numbers";
+    }
+    
+    // Cannot start with number
+    if (/^[0-9]/.test(username)) {
+        return "Username cannot start with a number";
+    }
+    
+    // Check for reserved words
+    const reservedWords = ['admin', 'system', 'root', 'user', 'guest', 'test', 'null', 'undefined', 'memochat'];
+    if (reservedWords.includes(username.toLowerCase())) {
+        return "This username is reserved and cannot be used";
+    }
+    
+    return null; // Valid username
+}
+
+// CAPTCHA REFRESH FUNCTION
+function refreshCaptcha() {
+    generateCaptcha();
+    showToast('New math question generated');
+}
+
+// ===============================
+// LOGIN SYSTEM FUNCTIONS
+// ===============================
+
 function showLoginForm() {
     document.getElementById('loginScreen').style.display = 'flex';
     document.getElementById('mainApp').style.display = 'none';
@@ -65,6 +192,85 @@ function showMainApp() {
     document.getElementById('mainApp').style.display = 'flex';
 }
 
+// UPDATED REGISTRATION FUNCTION with enhanced validation
+async function handleRegister() {
+    const username = document.getElementById('loginUsername').value.trim();
+    const password = document.getElementById('loginPassword').value.trim();
+
+    // Basic validation
+    if (!username || !password) {
+        showToast('Please enter both username and password');
+        return;
+    }
+
+    // 1. VALIDATE USERNAME
+    const usernameError = validateUsername(username);
+    if (usernameError) {
+        showToast(usernameError);
+        return;
+    }
+
+    // 2. VALIDATE PASSWORD
+    const passwordError = validatePassword(password);
+    if (passwordError) {
+        showToast(passwordError);
+        return;
+    }
+
+    // 3. VALIDATE CAPTCHA
+    if (!validateCaptcha()) {
+        showToast('Incorrect answer to the math question. Please try again.');
+        generateCaptcha(); // Generate new question
+        return;
+    }
+
+    try {
+        // Show loading state
+        const registerBtn = document.getElementById('registerBtn');
+        registerBtn.textContent = 'Creating account...';
+        registerBtn.disabled = true;
+
+        // Call Railway backend directly
+        const response = await fetch(`${BACKEND_URL}/api/auth/register`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ username, password })
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`Registration failed: ${response.status} - ${errorText}`);
+        }
+
+        const data = await response.json();
+
+        showToast('Account created successfully! Please login.');
+        
+        // Clear form and generate new captcha
+        document.getElementById('loginUsername').value = '';
+        document.getElementById('loginPassword').value = '';
+        generateCaptcha();
+        
+        // Auto-focus login for convenience
+        setTimeout(() => {
+            document.getElementById('loginUsername').focus();
+        }, 1000);
+
+    } catch (error) {
+        console.error('Registration error:', error);
+        showToast(`Registration failed: ${error.message}`);
+        generateCaptcha(); // Generate new captcha on error
+    } finally {
+        // Reset button state
+        const registerBtn = document.getElementById('registerBtn');
+        registerBtn.textContent = 'Create Account';
+        registerBtn.disabled = false;
+    }
+}
+
+// UPDATED LOGIN FUNCTION with enhanced validation
 async function handleLogin() {
     const username = document.getElementById('loginUsername').value.trim();
     const password = document.getElementById('loginPassword').value.trim();
@@ -74,6 +280,7 @@ async function handleLogin() {
         return;
     }
 
+    // Basic username validation (less strict for login)
     if (username.length < 3) {
         showToast('Username must be at least 3 characters');
         return;
@@ -90,6 +297,8 @@ async function handleLogin() {
         loginBtn.textContent = 'Logging in...';
         loginBtn.disabled = true;
 
+        console.log('Attempting login to:', `${BACKEND_URL}/api/auth/login`);
+
         // Call Railway backend directly
         const response = await fetch(`${BACKEND_URL}/api/auth/login`, {
             method: 'POST',
@@ -99,12 +308,16 @@ async function handleLogin() {
             body: JSON.stringify({ username, password })
         });
 
+        console.log('Login response status:', response.status);
+
         if (!response.ok) {
             const errorText = await response.text();
-            throw new Error(`Login failed: ${response.status} - ${errorText}`);
+            console.error('Login error response:', errorText);
+            throw new Error(`Login failed: ${response.status} - ${errorText.substring(0, 100)}`);
         }
 
         const data = await response.json();
+        console.log('Login successful');
 
         // Store auth token
         localStorage.setItem('authToken', data.token);
@@ -134,62 +347,6 @@ async function handleLogin() {
         const loginBtn = document.getElementById('loginBtn');
         loginBtn.textContent = 'Login';
         loginBtn.disabled = false;
-    }
-}
-
-async function handleRegister() {
-    const username = document.getElementById('loginUsername').value.trim();
-    const password = document.getElementById('loginPassword').value.trim();
-
-    if (!username || !password) {
-        showToast('Please enter both username and password');
-        return;
-    }
-
-    if (username.length < 3) {
-        showToast('Username must be at least 3 characters');
-        return;
-    }
-
-    if (password.length < 6) {
-        showToast('Password must be at least 6 characters');
-        return;
-    }
-
-    try {
-        // Show loading state
-        const registerBtn = document.getElementById('registerBtn');
-        registerBtn.textContent = 'Creating account...';
-        registerBtn.disabled = true;
-
-        // Call Railway backend directly
-        const response = await fetch(`${BACKEND_URL}/api/auth/register`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ username, password })
-        });
-
-        if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(`Registration failed: ${response.status} - ${errorText}`);
-        }
-
-        const data = await response.json();
-
-        showToast('Account created successfully! Please login.');
-        // Auto-login after successful registration
-        setTimeout(() => handleLogin(), 1000);
-
-    } catch (error) {
-        console.error('Registration error:', error);
-        showToast(`Registration failed: ${error.message}`);
-    } finally {
-        // Reset button state
-        const registerBtn = document.getElementById('registerBtn');
-        registerBtn.textContent = 'Create Account';
-        registerBtn.disabled = false;
     }
 }
 
@@ -260,6 +417,10 @@ function checkAuthStatus() {
     }
 }
 
+// ===============================
+// AUDIO CONTEXT INITIALIZATION
+// ===============================
+
 // FIXED: Initialize Web Audio Context for input volume control
 async function initializeAudioContext() {
     try {
@@ -295,6 +456,10 @@ async function initializeAudioContext() {
         console.warn('⚠️ Could not initialize audio context:', error);
     }
 }
+
+// ===============================
+// WEBRTC HELPER FUNCTIONS
+// ===============================
 
 // Helper function to process queued ICE candidates
 async function processQueuedCandidates(peerConnection, senderId, isScreenShare) {
@@ -698,6 +863,10 @@ async function setupScreenShareWithUser(userId) {
     }
 }
 
+// ===============================
+// ROOM MANAGEMENT FUNCTIONS
+// ===============================
+
 // Handle room type change
 function handleRoomChange() {
     const roomSelect = document.getElementById('roomSelect');
@@ -760,6 +929,10 @@ function copyRoomInfo() {
     }
 }
 
+// ===============================
+// VOLUME CONTROL FUNCTIONS
+// ===============================
+
 // FIXED: Volume controls with Web Audio API
 function updateInputVolume(value) {
     inputVolumeLevel = value;
@@ -787,6 +960,10 @@ function updateOutputVolume(value) {
     console.log(`🔊 Output volume set to ${value}%`);
 }
 
+// ===============================
+// MOBILE VIEW MANAGEMENT
+// ===============================
+
 // Mobile view management
 function toggleMobileView() {
     const sidebar = document.getElementById('sidebar');
@@ -807,6 +984,10 @@ function toggleMobileView() {
         }
     }
 }
+
+// ===============================
+// UTILITY FUNCTIONS
+// ===============================
 
 // Show toast notification
 function showToast(message, duration = 3000) {
@@ -864,6 +1045,10 @@ function updateConnectionStatus(status) {
             statusEl.textContent = 'Disconnected';
     }
 }
+
+// ===============================
+// SOCKET INITIALIZATION
+// ===============================
 
 // Initialize app and socket connection
 async function initializeApp() {
@@ -947,6 +1132,10 @@ async function initializeApp() {
     updateConnectionStatus('connecting');
 }
 
+// ===============================
+// ROOM JOINING FUNCTIONS
+// ===============================
+
 // Join room function
 async function joinRoom() {
     const username = document.getElementById('usernameInput').value.trim();
@@ -1015,6 +1204,10 @@ async function joinRoom() {
         updateConnectionStatus('disconnected');
     }
 }
+
+// ===============================
+// ROOM EVENT HANDLERS
+// ===============================
 
 // Handle room joined
 function handleRoomJoined(data) {
@@ -1145,6 +1338,10 @@ function handleUserScreenShareStop(data) {
     const elements = document.querySelectorAll(`[id^="video-screen-${data.userId}"]`);
     elements.forEach(el => el.remove());
 }
+
+// ===============================
+// WEBRTC VOICE CHAT FUNCTIONS
+// ===============================
 
 // WebRTC Voice Chat Functions
 async function startGroupVoiceChat(users) {
@@ -1303,6 +1500,10 @@ function cleanupVoiceChat() {
     
     console.log('✅ Connection cleanup complete');
 }
+
+// ===============================
+// UI CONTROL FUNCTIONS
+// ===============================
 
 // UI Control Functions
 function toggleMic() {
@@ -1520,6 +1721,10 @@ function leaveRoom() {
     currentRoom = null;
 }
 
+// ===============================
+// AUDIO FEEDBACK SYSTEM
+// ===============================
+
 // Audio feedback system
 function playNotificationSound(type) {
     try {
@@ -1562,6 +1767,10 @@ function playNotificationSound(type) {
         console.log('Audio notification not available');
     }
 }
+
+// ===============================
+// ELEMENT MANAGEMENT FUNCTIONS
+// ===============================
 
 // Element Management Functions
 function addVoiceElement(userId, userName, stream, isLocal = false) {
@@ -1733,6 +1942,10 @@ function applyVolumeSettings() {
     });
 }
 
+// ===============================
+// CHAT FUNCTIONS
+// ===============================
+
 // Chat Functions
 function sendMessage() {
     const chatInput = document.getElementById('chatInput');
@@ -1802,6 +2015,10 @@ function clearChat() {
         </div>
     `;
 }
+
+// ===============================
+// USER MANAGEMENT FUNCTIONS
+// ===============================
 
 // User Management Functions
 function addUserToList(userData) {
@@ -1888,6 +2105,10 @@ function clearVideoGrid() {
     `;
 }
 
+// ===============================
+// DEBUG AND MONITORING FUNCTIONS
+// ===============================
+
 // Debug function to check connections
 function debugConnections() {
     console.log('=== ENHANCED CONNECTION DEBUG ===');
@@ -1953,10 +2174,19 @@ function startConnectionHealthMonitoring() {
     }, 30000); // Check every 30 seconds
 }
 
+// ===============================
+// EVENT LISTENERS
+// ===============================
+
 // Event Listeners
 document.addEventListener('DOMContentLoaded', () => {
     checkAuthStatus();
     startConnectionHealthMonitoring();
+    
+    // Generate initial captcha
+    if (document.getElementById('captchaQuestion')) {
+        generateCaptcha();
+    }
 });
 
 // Handle enter key in inputs
@@ -1966,6 +2196,21 @@ document.addEventListener('keypress', function(e) {
     }
     if (e.target.id === 'loginPassword' && e.key === 'Enter') {
         handleLogin();
+    }
+    if (e.target.id === 'captchaAnswer' && e.key === 'Enter') {
+        if (e.target.closest('#loginScreen')) {
+            // Determine which button to trigger based on context
+            const registerBtn = document.getElementById('registerBtn');
+            const loginBtn = document.getElementById('loginBtn');
+            
+            // If password field has content, try login first, otherwise register
+            const password = document.getElementById('loginPassword').value.trim();
+            if (password.length >= 6) {
+                handleLogin();
+            } else {
+                handleRegister();
+            }
+        }
     }
     if (e.target.id === 'usernameInput' && e.key === 'Enter') {
         joinRoom();
@@ -2005,5 +2250,12 @@ window.addEventListener('resize', function() {
     }
 });
 
+// ===============================
+// PERIODIC MAINTENANCE
+// ===============================
+
 // Periodically apply volume settings to ensure all elements have correct volume
 setInterval(applyVolumeSettings, 1000);
+
+// Make debug function available globally for troubleshooting
+window.debugConnections = debugConnections;
