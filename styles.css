@@ -84,17 +84,19 @@ body {
 /* FIXED: Mobile responsive design for logout button */
 @media (max-width: 768px) {
     .logout-btn {
-        top: 10px;
-        right: 10px;
+        top: 10px !important;
+        right: 10px !important;
         padding: 6px 12px !important;
         font-size: 11px !important;
+        min-width: auto !important;
+        width: auto !important;
+        max-width: 80px !important;
     }
     
     .header {
-        margin-right: 90px !important; /* Override for mobile */
+        margin-right: 90px !important;
     }
     
-    /* Stack controls vertically on very small screens */
     .controls {
         flex-direction: column;
         gap: 6px;
