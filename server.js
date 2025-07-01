@@ -5,6 +5,8 @@ const cors = require('cors');
 const rateLimit = require('express-rate-limit');
 const helmet = require('helmet');
 const path = require('path');
+const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
 
 const app = express();
 const server = http.createServer(app);
@@ -28,6 +30,14 @@ const limiter = rateLimit({
 });
 app.use(limiter);
 
+// Auth rate limiting
+const authLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 5, // limit each IP to 5 auth attempts per windowMs
+    message: 'Too many authentication attempts from this IP',
+    skipSuccessfulRequests: true
+});
+
 // Chat message rate limiting
 const chatLimiter = rateLimit({
     windowMs: 60 * 1000, // 1 minute
@@ -38,6 +48,13 @@ const chatLimiter = rateLimit({
 
 app.use(express.json());
 app.use(express.static('public'));
+
+// In-memory user storage (replace with database in production)
+const users = new Map();
+const userSessions = new Map();
+
+// JWT secret (use environment variable in production)
+const JWT_SECRET = process.env.JWT_SECRET || 'your-super-secret-jwt-key-change-in-production';
 
 // Socket.IO setup with CORS
 const io = socketIo(server, {
@@ -51,9 +68,45 @@ const io = socketIo(server, {
 
 // Data structures to manage rooms and users
 const rooms = new Map();
-const users = new Map();
+const connectedUsers = new Map();
 const roomPasswords = new Map(); // Store room passwords
 const userMessageHistory = new Map(); // Track user message history for spam protection
+
+// Authentication middleware
+function authenticateToken(req, res, next) {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+
+    if (!token) {
+        return res.status(401).json({ message: 'Access token required' });
+    }
+
+    jwt.verify(token, JWT_SECRET, (err, user) => {
+        if (err) {
+            return res.status(403).json({ message: 'Invalid or expired token' });
+        }
+        req.user = user;
+        next();
+    });
+}
+
+// Socket authentication middleware
+function authenticateSocket(socket, next) {
+    const token = socket.handshake.auth.token;
+    
+    if (!token) {
+        return next(new Error('Authentication error'));
+    }
+
+    jwt.verify(token, JWT_SECRET, (err, decoded) => {
+        if (err) {
+            return next(new Error('Authentication error'));
+        }
+        socket.userId = decoded.userId;
+        socket.username = decoded.username;
+        next();
+    });
+}
 
 // Room management
 class Room {
@@ -126,6 +179,171 @@ class User {
     }
 }
 
+// Authentication routes
+app.post('/api/auth/register', authLimiter, async (req, res) => {
+    try {
+        const { username, password } = req.body;
+
+        // Validation
+        if (!username || !password) {
+            return res.status(400).json({ message: 'Username and password are required' });
+        }
+
+        if (username.length < 3 || username.length > 20) {
+            return res.status(400).json({ message: 'Username must be 3-20 characters' });
+        }
+
+        if (password.length < 6) {
+            return res.status(400).json({ message: 'Password must be at least 6 characters' });
+        }
+
+        // Check if username already exists
+        if (users.has(username.toLowerCase())) {
+            return res.status(409).json({ message: 'Username already exists' });
+        }
+
+        // Hash password
+        const saltRounds = 10;
+        const hashedPassword = await bcrypt.hash(password, saltRounds);
+
+        // Create user
+        const userId = generateId();
+        const userData = {
+            id: userId,
+            username: username,
+            password: hashedPassword,
+            createdAt: new Date(),
+            lastLogin: null
+        };
+
+        users.set(username.toLowerCase(), userData);
+
+        res.status(201).json({ 
+            message: 'User created successfully',
+            userId: userId
+        });
+
+        console.log(`New user registered: ${username}`);
+
+    } catch (error) {
+        console.error('Registration error:', error);
+        res.status(500).json({ message: 'Internal server error' });
+    }
+});
+
+app.post('/api/auth/login', authLimiter, async (req, res) => {
+    try {
+        const { username, password } = req.body;
+
+        // Validation
+        if (!username || !password) {
+            return res.status(400).json({ message: 'Username and password are required' });
+        }
+
+        // Find user
+        const userData = users.get(username.toLowerCase());
+        if (!userData) {
+            return res.status(401).json({ message: 'Invalid username or password' });
+        }
+
+        // Verify password
+        const passwordMatch = await bcrypt.compare(password, userData.password);
+        if (!passwordMatch) {
+            return res.status(401).json({ message: 'Invalid username or password' });
+        }
+
+        // Update last login
+        userData.lastLogin = new Date();
+
+        // Generate JWT token
+        const token = jwt.sign(
+            { 
+                userId: userData.id, 
+                username: userData.username 
+            },
+            JWT_SECRET,
+            { expiresIn: '24h' }
+        );
+
+        // Store session
+        userSessions.set(userData.id, {
+            token: token,
+            loginTime: new Date(),
+            lastActivity: new Date()
+        });
+
+        res.json({
+            message: 'Login successful',
+            token: token,
+            userId: userData.id,
+            username: userData.username
+        });
+
+        console.log(`User logged in: ${username}`);
+
+    } catch (error) {
+        console.error('Login error:', error);
+        res.status(500).json({ message: 'Internal server error' });
+    }
+});
+
+app.post('/api/auth/verify', authenticateToken, (req, res) => {
+    try {
+        // Update last activity
+        const session = userSessions.get(req.user.userId);
+        if (session) {
+            session.lastActivity = new Date();
+        }
+
+        res.json({
+            valid: true,
+            userId: req.user.userId,
+            username: req.user.username
+        });
+    } catch (error) {
+        console.error('Token verification error:', error);
+        res.status(500).json({ message: 'Internal server error' });
+    }
+});
+
+app.post('/api/auth/logout', authenticateToken, (req, res) => {
+    try {
+        // Remove session
+        userSessions.delete(req.user.userId);
+
+        res.json({ message: 'Logout successful' });
+        console.log(`User logged out: ${req.user.username}`);
+    } catch (error) {
+        console.error('Logout error:', error);
+        res.status(500).json({ message: 'Internal server error' });
+    }
+});
+
+// Utility functions
+function sanitizeInput(input) {
+    return input.replace(/[<>]/g, '').trim().substring(0, 500);
+}
+
+function isValidRoomName(roomName) {
+    const validRooms = ['general', 'gaming', 'study', 'music', 'private'];
+    return validRooms.includes(roomName) || /^custom_[a-zA-Z0-9_]+$/.test(roomName);
+}
+
+function isValidUsername(username) {
+    return username && 
+           username.length >= 2 && 
+           username.length <= 20 && 
+           /^[a-zA-Z0-9_\-\s]+$/.test(username);
+}
+
+function generateId() {
+    return Math.random().toString(36).substr(2, 9);
+}
+
+function generateRoomId() {
+    return 'custom_' + Math.random().toString(36).substr(2, 9);
+}
+
 // Spam protection functions
 function checkSpam(userId, socketId) {
     const now = Date.now();
@@ -183,30 +401,18 @@ function levenshteinDistance(str1, str2) {
     return matrix[str2.length][str1.length];
 }
 
-// Utility functions
-function sanitizeInput(input) {
-    return input.replace(/[<>]/g, '').trim().substring(0, 500);
-}
+// Socket.IO connection handling with authentication
+io.use(authenticateSocket);
 
-function isValidRoomName(roomName) {
-    const validRooms = ['general', 'gaming', 'study', 'music', 'private'];
-    return validRooms.includes(roomName) || /^custom_[a-zA-Z0-9_]+$/.test(roomName);
-}
-
-function isValidUsername(username) {
-    return username && 
-           username.length >= 2 && 
-           username.length <= 20 && 
-           /^[a-zA-Z0-9_\-\s]+$/.test(username);
-}
-
-function generateRoomId() {
-    return 'custom_' + Math.random().toString(36).substr(2, 9);
-}
-
-// Socket.IO connection handling
 io.on('connection', (socket) => {
-    console.log(`New connection: ${socket.id}`);
+    console.log(`New authenticated connection: ${socket.id} (${socket.username})`);
+    
+    // Store socket connection
+    connectedUsers.set(socket.id, {
+        userId: socket.userId,
+        username: socket.username,
+        socketId: socket.id
+    });
     
     // Handle creating password-protected room
     socket.on('create-private-room', (data) => {
@@ -233,7 +439,7 @@ io.on('connection', (socket) => {
                 password: password
             });
             
-            console.log(`Private room created: ${roomId}`);
+            console.log(`Private room created by ${socket.username}: ${roomId}`);
             
         } catch (error) {
             console.error('Error creating private room:', error);
@@ -261,6 +467,12 @@ io.on('connection', (socket) => {
                 socket.emit('error', { message: 'Invalid room name' });
                 return;
             }
+
+            // Verify user owns this session
+            if (userId !== socket.userId) {
+                socket.emit('error', { message: 'Invalid user session' });
+                return;
+            }
             
             const sanitizedUsername = sanitizeInput(username);
             
@@ -281,7 +493,7 @@ io.on('connection', (socket) => {
             user.room = room;
             
             // Add user to room and global users map
-            users.set(socket.id, user);
+            connectedUsers.set(socket.id, user);
             const roomUsers = roomObj.addUser(user);
             
             // Join socket room
@@ -330,7 +542,7 @@ io.on('connection', (socket) => {
     // Enhanced chat message handling with spam protection
     socket.on('chat-message', (data) => {
         try {
-            const user = users.get(socket.id);
+            const user = connectedUsers.get(socket.id);
             if (!user || !user.room) {
                 socket.emit('error', { message: 'Not in a room' });
                 return;
@@ -386,11 +598,11 @@ io.on('connection', (socket) => {
     // Enhanced WebRTC signaling for voice chat and screen sharing
     socket.on('webrtc-offer', (data) => {
         const { targetUserId, offer, callerId, isScreenShare } = data;
-        const user = users.get(socket.id);
+        const user = connectedUsers.get(socket.id);
         
         if (user && user.room) {
             // Forward offer to specific user
-            const targetUser = Array.from(users.values()).find(u => u.id === targetUserId);
+            const targetUser = Array.from(connectedUsers.values()).find(u => u.id === targetUserId);
             if (targetUser) {
                 console.log(`Forwarding ${isScreenShare ? 'screen share' : 'voice'} offer from ${user.username} to ${targetUser.username}`);
                 
@@ -408,11 +620,11 @@ io.on('connection', (socket) => {
 
     socket.on('webrtc-answer', (data) => {
         const { targetUserId, answer, answererId, isScreenShare } = data;
-        const user = users.get(socket.id);
+        const user = connectedUsers.get(socket.id);
         
         if (user && user.room) {
             // Forward answer to caller
-            const targetUser = Array.from(users.values()).find(u => u.id === targetUserId);
+            const targetUser = Array.from(connectedUsers.values()).find(u => u.id === targetUserId);
             if (targetUser) {
                 console.log(`Forwarding ${isScreenShare ? 'screen share' : 'voice'} answer from ${user.username} to ${targetUser.username}`);
                 
@@ -430,11 +642,11 @@ io.on('connection', (socket) => {
 
     socket.on('webrtc-ice-candidate', (data) => {
         const { targetUserId, candidate, senderId, isScreenShare } = data;
-        const user = users.get(socket.id);
+        const user = connectedUsers.get(socket.id);
         
         if (user && user.room) {
             // Forward ICE candidate to target user
-            const targetUser = Array.from(users.values()).find(u => u.id === targetUserId);
+            const targetUser = Array.from(connectedUsers.values()).find(u => u.id === targetUserId);
             if (targetUser) {
                 io.to(targetUser.socketId).emit('webrtc-ice-candidate', {
                     candidate: candidate,
@@ -447,7 +659,7 @@ io.on('connection', (socket) => {
 
     // Enhanced screen share start handler
     socket.on('screen-share-start', (data) => {
-        const user = users.get(socket.id);
+        const user = connectedUsers.get(socket.id);
         if (user && user.room) {
             user.isScreenSharing = true;
             user.screenShareStartTime = new Date();
@@ -487,7 +699,7 @@ io.on('connection', (socket) => {
 
     // Enhanced screen share stop handler
     socket.on('screen-share-stop', (data) => {
-        const user = users.get(socket.id);
+        const user = connectedUsers.get(socket.id);
         if (user && user.room) {
             user.isScreenSharing = false;
             user.screenShareStartTime = null;
@@ -525,121 +737,9 @@ io.on('connection', (socket) => {
         }
     });    
 
-    // Handle when user wants to start voice call with someone
-    socket.on('call-user', (data) => {
-        const { targetUserId } = data;
-        const user = users.get(socket.id);
-        
-        if (user && user.room) {
-            const targetUser = Array.from(users.values()).find(u => u.id === targetUserId);
-            if (targetUser) {
-                io.to(targetUser.socketId).emit('incoming-call', {
-                    callerId: user.id,
-                    callerName: user.username
-                });
-                console.log(`${user.username} is calling ${targetUser.username}`);
-            }
-        }
-    });
-
-    // Handle call responses
-    socket.on('call-response', (data) => {
-        const { callerId, accepted } = data;
-        const user = users.get(socket.id);
-        
-        if (user) {
-            const callerUser = Array.from(users.values()).find(u => u.id === callerId);
-            if (callerUser) {
-                io.to(callerUser.socketId).emit('call-response', {
-                    targetId: user.id,
-                    targetName: user.username,
-                    accepted: accepted
-                });
-                
-                // Update call status for both users
-                if (accepted) {
-                    user.isInCall = true;
-                    user.callPartner = callerId;
-                    callerUser.isInCall = true;
-                    callerUser.callPartner = user.id;
-                    
-                    // Notify room about call status change
-                    updateUserCallStatus(user);
-                    updateUserCallStatus(callerUser);
-                }
-                
-                console.log(`${user.username} ${accepted ? 'accepted' : 'rejected'} call from ${callerUser.username}`);
-            }
-        }
-    });
-
-    // Handle ending calls
-    socket.on('end-call', (data) => {
-        const { targetUserId } = data;
-        const user = users.get(socket.id);
-        
-        if (user) {
-            // End call for both users
-            endCallForUser(user);
-            
-            if (targetUserId) {
-                const targetUser = Array.from(users.values()).find(u => u.id === targetUserId);
-                if (targetUser) {
-                    endCallForUser(targetUser);
-                    io.to(targetUser.socketId).emit('call-ended', {
-                        userId: user.id,
-                        userName: user.username
-                    });
-                }
-            }
-        }
-    });
-    
-    // Original WebRTC signaling (for backward compatibility)
-    socket.on('offer', (data) => {
-        const { targetUserId, offer } = data;
-        const user = users.get(socket.id);
-        
-        if (user && user.room) {
-            socket.to(user.room).emit('offer', {
-                fromUserId: user.id,
-                fromUsername: user.username,
-                targetUserId,
-                offer
-            });
-        }
-    });
-    
-    socket.on('answer', (data) => {
-        const { targetUserId, answer } = data;
-        const user = users.get(socket.id);
-        
-        if (user && user.room) {
-            socket.to(user.room).emit('answer', {
-                fromUserId: user.id,
-                fromUsername: user.username,
-                targetUserId,
-                answer
-            });
-        }
-    });
-    
-    socket.on('ice-candidate', (data) => {
-        const { targetUserId, candidate } = data;
-        const user = users.get(socket.id);
-        
-        if (user && user.room) {
-            socket.to(user.room).emit('ice-candidate', {
-                fromUserId: user.id,
-                targetUserId,
-                candidate
-            });
-        }
-    });
-    
     // Handle user status updates
     socket.on('user-status', (data) => {
-        const user = users.get(socket.id);
+        const user = connectedUsers.get(socket.id);
         if (!user || !user.room) return;
         
         const { isMuted, isScreenSharing } = data;
@@ -658,38 +758,18 @@ io.on('connection', (socket) => {
     
     // Handle disconnection
     socket.on('disconnect', () => {
-        console.log(`User disconnected: ${socket.id}`);
+        console.log(`User disconnected: ${socket.id} (${socket.username})`);
         handleUserLeave(socket);
         // Clean up user message history
         userMessageHistory.delete(socket.id);
+        // Remove from connected users
+        connectedUsers.delete(socket.id);
     });
 });
 
-// Helper function to end call for a user
-function endCallForUser(user) {
-    if (user.isInCall) {
-        user.isInCall = false;
-        user.callPartner = null;
-        updateUserCallStatus(user);
-    }
-}
-
-// Helper function to update user call status in room
-function updateUserCallStatus(user) {
-    if (user.room) {
-        io.to(user.room).emit('user-status-update', {
-            userId: user.id,
-            username: user.username,
-            isMuted: user.isMuted,
-            isScreenSharing: user.isScreenSharing,
-            isInCall: user.isInCall
-        });
-    }
-}
-
 // Enhanced helper function to handle user leaving
 function handleUserLeave(socket, userId = null) {
-    const user = users.get(socket.id);
+    const user = connectedUsers.get(socket.id);
     if (!user) return;
     
     // If user was screen sharing, notify others
@@ -713,18 +793,6 @@ function handleUserLeave(socket, userId = null) {
             };
             room.addMessage(systemMessage);
             socket.to(user.room).emit('chat-message', systemMessage);
-        }
-    }
-    
-    // End any active calls
-    if (user.isInCall && user.callPartner) {
-        const partnerUser = Array.from(users.values()).find(u => u.id === user.callPartner);
-        if (partnerUser) {
-            endCallForUser(partnerUser);
-            io.to(partnerUser.socketId).emit('call-ended', {
-                userId: user.id,
-                userName: user.username
-            });
         }
     }
     
@@ -765,7 +833,7 @@ function handleUserLeave(socket, userId = null) {
     }
     
     // Remove user from global users map
-    users.delete(socket.id);
+    connectedUsers.delete(socket.id);
 }
 
 // REST API endpoints
@@ -774,7 +842,8 @@ app.get('/api/health', (req, res) => {
         status: 'ok',
         timestamp: new Date().toISOString(),
         rooms: rooms.size,
-        users: users.size
+        users: connectedUsers.size,
+        registeredUsers: users.size
     });
 });
 
@@ -788,7 +857,7 @@ app.get('/api/rooms', (req, res) => {
     
     res.json({
         rooms: roomStats,
-        totalUsers: users.size
+        totalUsers: connectedUsers.size
     });
 });
 
@@ -826,59 +895,6 @@ app.get('/api/room/:roomName', (req, res) => {
     });
 });
 
-// API endpoint to get room screen sharing status
-app.get('/api/room/:roomName/screenshare', (req, res) => {
-    const { roomName } = req.params;
-    
-    if (!isValidRoomName(roomName)) {
-        return res.status(400).json({ error: 'Invalid room name' });
-    }
-    
-    const room = rooms.get(roomName);
-    if (!room) {
-        return res.json({
-            room: roomName,
-            screenSharingSessions: [],
-            totalSessions: 0
-        });
-    }
-    
-    const screenSharingSessions = room.getUsers()
-        .filter(user => user.isScreenSharing)
-        .map(user => ({
-            userId: user.id,
-            username: user.username,
-            startTime: user.screenShareStartTime || null
-        }));
-    
-    res.json({
-        room: roomName,
-        screenSharingSessions,
-        totalSessions: screenSharingSessions.length
-    });
-});
-
-// Debug endpoint for troubleshooting
-app.get('/api/debug/webrtc', (req, res) => {
-    const debugInfo = {
-        totalUsers: users.size,
-        totalRooms: rooms.size,
-        usersScreenSharing: Array.from(users.values())
-            .filter(u => u.isScreenSharing)
-            .map(u => ({ username: u.username, room: u.room })),
-        roomsWithScreenShare: Array.from(rooms.entries())
-            .filter(([name, room]) => room.getUsers().some(u => u.isScreenSharing))
-            .map(([name, room]) => ({
-                roomName: name,
-                usersSharingScreen: room.getUsers()
-                    .filter(u => u.isScreenSharing)
-                    .map(u => u.username)
-            }))
-    };
-    
-    res.json(debugInfo);
-});
-
 // Serve the frontend HTML file
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
@@ -906,7 +922,7 @@ function cleanup() {
 process.on('SIGTERM', cleanup);
 process.on('SIGINT', cleanup);
 
-// Periodic cleanup of empty rooms and old messages - COMPLETE FUNCTION
+// Periodic cleanup of empty rooms and old messages
 setInterval(() => {
     let cleaned = 0;
     for (const [roomName, room] of rooms.entries()) {
@@ -927,6 +943,13 @@ setInterval(() => {
         }
     }
     
+    // Clean up old sessions
+    for (const [userId, session] of userSessions.entries()) {
+        if (Date.now() - session.lastActivity.getTime() > 24 * 60 * 60 * 1000) { // 24 hours
+            userSessions.delete(userId);
+        }
+    }
+    
     if (cleaned > 0) {
         console.log(`Cleaned up ${cleaned} empty rooms`);
     }
@@ -934,7 +957,7 @@ setInterval(() => {
 
 const PORT = process.env.PORT || 3001;
 server.listen(PORT, () => {
-    console.log(`📝 MemoChat Server running on port ${PORT}`);
+    console.log(`📝 MemoChat Server with Authentication running on port ${PORT}`);
     console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
     console.log(`Frontend URL: ${process.env.FRONTEND_URL || 'http://localhost:3000'}`);
 });
