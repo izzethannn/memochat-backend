@@ -38,6 +38,8 @@ body {
 .main-content.active {
     display: flex;
 }
+
+/* FIXED: Logout button positioning */
 .logout-btn {
     position: fixed;
     top: 20px;
@@ -47,6 +49,10 @@ body {
     font-size: 12px !important;
     min-width: auto !important;
     flex: none !important;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: all 0.3s ease;
 }
 
 @media (min-width: 768px) {
@@ -74,6 +80,8 @@ body {
         gap: 20px;
     }
 }
+
+/* FIXED: Mobile responsive design for logout button */
 @media (max-width: 768px) {
     .logout-btn {
         top: 10px;
@@ -83,7 +91,7 @@ body {
     }
     
     .header {
-        margin-right: 80px; /* Less space on mobile */
+        margin-right: 90px !important; /* Override for mobile */
     }
     
     /* Stack controls vertically on very small screens */
@@ -95,6 +103,20 @@ body {
     .controls .btn {
         flex: none;
         width: 100%;
+    }
+}
+
+/* FIXED: Very small screens - move logout to bottom */
+@media (max-width: 480px) {
+    .logout-btn {
+        top: auto;
+        bottom: 90px;
+        right: 10px;
+        left: auto;
+    }
+    
+    .header {
+        margin-right: 15px !important; /* Reset margin on very small screens */
     }
 }
 
@@ -233,11 +255,12 @@ body {
     color: #f04747;
 }
 
+/* FIXED: Header with proper spacing for all screen sizes */
 .header {
     background: rgba(0, 0, 0, 0.2);
     padding: 12px 15px;
     border-radius: 10px;
-    margin-right: 100px; /* Space for logout button */
+    margin-right: 140px; /* Increased space for logout button */
     margin-bottom: 15px;
     display: flex;
     flex-direction: column;
@@ -251,7 +274,15 @@ body {
         align-items: center;
         padding: 15px 20px;
         margin-bottom: 20px;
+        margin-right: 150px; /* More space on larger screens */
         gap: 0;
+    }
+}
+
+/* FIXED: Extra space on very large screens */
+@media (min-width: 1200px) {
+    .header {
+        margin-right: 160px;
     }
 }
 
@@ -269,6 +300,8 @@ body {
     display: flex;
     gap: 8px;
     flex-wrap: wrap;
+    position: relative;
+    z-index: 100; /* Ensure controls stay below logout button */
 }
 
 .btn {
@@ -309,6 +342,7 @@ body {
 
 .btn-danger:hover {
     background: #d73c3c;
+    transform: translateY(-1px);
 }
 
 .btn-success {
@@ -318,6 +352,7 @@ body {
 
 .btn-success:hover {
     background: #369968;
+    transform: translateY(-1px);
 }
 
 .btn:disabled {
@@ -517,9 +552,10 @@ body {
     font-size: 11px;
 }
 
+/* FIXED: Connection status positioning to avoid conflict with logout */
 .connection-status {
     position: fixed;
-    top: 10px;
+    top: 60px; /* Moved down to avoid logout button */
     right: 10px;
     padding: 6px 10px;
     border-radius: 6px;
@@ -675,4 +711,82 @@ body {
 @keyframes screenShareGlow {
     0%, 100% { border-color: #faa61a; }
     50% { border-color: #ff6b6b; }
+}
+
+/* ADDED: Login screen styles integration */
+.login-screen {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    padding: 20px;
+}
+
+.login-container {
+    background: rgba(0, 0, 0, 0.3);
+    backdrop-filter: blur(10px);
+    padding: 40px;
+    border-radius: 15px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    width: 100%;
+    max-width: 400px;
+    text-align: center;
+}
+
+.login-container h1 {
+    color: white;
+    margin-bottom: 10px;
+    font-size: 28px;
+}
+
+.login-container p {
+    color: rgba(255, 255, 255, 0.8);
+    margin-bottom: 30px;
+    font-size: 14px;
+}
+
+.login-form {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.login-form input {
+    padding: 15px;
+    border: none;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+    font-size: 16px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    transition: all 0.3s ease;
+}
+
+.login-form input:focus {
+    outline: none;
+    background: rgba(255, 255, 255, 0.15);
+    border-color: #7289da;
+}
+
+.login-form input::placeholder {
+    color: rgba(255, 255, 255, 0.6);
+}
+
+.login-buttons {
+    display: flex;
+    gap: 10px;
+    flex-direction: column;
+}
+
+.login-buttons .btn {
+    padding: 15px;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+@media (max-width: 768px) {
+    .login-container {
+        padding: 30px 20px;
+    }
 }
