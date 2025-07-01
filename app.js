@@ -142,7 +142,7 @@ function initializeKeyboardShortcuts() {
     document.addEventListener('keyup', handleKeyUp);
     
     // Show keyboard shortcuts hint
-    showToast('💡 Tip: Hold SPACE to toggle mute, ESC to leave, CTRL+S for screen share', 4000);
+    showToast('💡 Tip: CTRL+M to mute, CTRL+L to leave, CTRL+S for screen share', 4000);
 }
 
 function handleKeyDown(event) {
@@ -157,65 +157,33 @@ function handleKeyDown(event) {
     }
     
     switch(event.key) {
-        case ' ': // Spacebar
-            if (!isSpacePressed && localStream) {
-                event.preventDefault();
-                isSpacePressed = true;
-                isSpaceMuting = true;
-                
-                // Visual feedback
-                const micBtn = document.getElementById('micBtn');
-                if (micBtn) {
-                    micBtn.style.transform = 'scale(0.95)';
-                    micBtn.style.boxShadow = '0 0 15px rgba(114, 137, 218, 0.5)';
-                }
-                
-                toggleMic();
-                showToast('🎤 Space to mute active', 1000);
-            }
-            break;
-            
-        case 'Escape':
-            // ESC to leave room
-            if (currentRoom) {
-                event.preventDefault();
-                if (confirm('Leave the current room?')) {
-                    leaveRoom();
-                }
-            }
-            break;
-            
-        case 's':
-            // S for screen share (when not typing)
-            if (event.ctrlKey && localStream) {
-                event.preventDefault();
-                toggleScreenShare();
-            }
-            break;
-    }
-}
-
-function handleKeyUp(event) {
-    // Don't trigger shortcuts when typing in inputs
-    if (event.target.matches('input, textarea, [contenteditable]')) {
-        return;
-    }
-    
-    if (event.key === ' ' && isSpacePressed && isSpaceMuting) {
-        event.preventDefault();
-        isSpacePressed = false;
-        isSpaceMuting = false;
-        
-        // Remove visual feedback
-        const micBtn = document.getElementById('micBtn');
-        if (micBtn) {
-            micBtn.style.transform = '';
-            micBtn.style.boxShadow = '';
+    case 'm':
+        // CTRL+M to toggle mute
+        if (event.ctrlKey && localStream) {
+            event.preventDefault();
+            toggleMic();
+            showToast('🎤 CTRL+M mute toggled', 1000);
         }
+        break;
         
-        toggleMic();
-        showToast('🎤 Space to mute released', 1000);
-    }
+    case 'l':
+        // CTRL+L to leave room
+        if (event.ctrlKey && currentRoom) {
+            event.preventDefault();
+            if (confirm('Leave the current room?')) {
+                leaveRoom();
+            }
+        }
+        break;
+        
+    case 's':
+        // CTRL+S for screen share
+        if (event.ctrlKey && localStream) {
+            event.preventDefault();
+            toggleScreenShare();
+        }
+        break;
+}
 }
 
 // ===============================
