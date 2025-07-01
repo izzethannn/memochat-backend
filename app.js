@@ -1,4 +1,5 @@
 // Global variables
+const BACKEND_URL = 'https://memochat-backend-production.up.railway.app'; // UPDATE THIS!
 let localStream = null;
 let screenStream = null;
 let socket = null;
@@ -86,12 +87,11 @@ async function handleLogin() {
     try {
         // Show loading state
         const loginBtn = document.getElementById('loginBtn');
-        const originalText = loginBtn.textContent;
         loginBtn.textContent = 'Logging in...';
         loginBtn.disabled = true;
 
-        // FIXED: Use relative URL and better error handling
-        const response = await fetch('./api/auth/login', {
+        // Call Railway backend directly
+        const response = await fetch(`${BACKEND_URL}/api/auth/login`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -99,37 +99,33 @@ async function handleLogin() {
             body: JSON.stringify({ username, password })
         });
 
-        // Check if response is actually JSON
-        const contentType = response.headers.get('content-type');
-        if (!contentType || !contentType.includes('application/json')) {
-            throw new Error(`Server returned ${response.status}: Expected JSON but got ${contentType}`);
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`Login failed: ${response.status} - ${errorText}`);
         }
 
         const data = await response.json();
 
-        if (response.ok) {
-            // Store auth token
-            localStorage.setItem('authToken', data.token);
-            localStorage.setItem('username', username);
-            
-            isLoggedIn = true;
-            currentUser = {
-                id: data.userId,
-                name: username,
-                token: data.token
-            };
+        // Store auth token
+        localStorage.setItem('authToken', data.token);
+        localStorage.setItem('username', username);
+        
+        isLoggedIn = true;
+        currentUser = {
+            id: data.userId,
+            name: username,
+            token: data.token
+        };
 
-            // Pre-fill username in main form
-            document.getElementById('usernameInput').value = username;
-            
-            showMainApp();
-            showToast('Login successful!');
-            
-            // Initialize socket connection after login
-            await initializeApp();
-        } else {
-            showToast(data.message || 'Login failed');
-        }
+        // Pre-fill username in main form
+        document.getElementById('usernameInput').value = username;
+        
+        showMainApp();
+        showToast('Login successful!');
+        
+        // Initialize socket connection after login
+        await initializeApp();
+
     } catch (error) {
         console.error('Login error:', error);
         showToast(`Login failed: ${error.message}`);
@@ -163,12 +159,11 @@ async function handleRegister() {
     try {
         // Show loading state
         const registerBtn = document.getElementById('registerBtn');
-        const originalText = registerBtn.textContent;
         registerBtn.textContent = 'Creating account...';
         registerBtn.disabled = true;
 
-        // FIXED: Use relative URL and better error handling
-        const response = await fetch('./api/auth/register', {
+        // Call Railway backend directly
+        const response = await fetch(`${BACKEND_URL}/api/auth/register`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -176,21 +171,17 @@ async function handleRegister() {
             body: JSON.stringify({ username, password })
         });
 
-        // Check if response is actually JSON
-        const contentType = response.headers.get('content-type');
-        if (!contentType || !contentType.includes('application/json')) {
-            throw new Error(`Server returned ${response.status}: Expected JSON but got ${contentType}`);
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`Registration failed: ${response.status} - ${errorText}`);
         }
 
         const data = await response.json();
 
-        if (response.ok) {
-            showToast('Account created successfully! Please login.');
-            // Auto-login after successful registration
-            setTimeout(() => handleLogin(), 1000);
-        } else {
-            showToast(data.message || 'Registration failed');
-        }
+        showToast('Account created successfully! Please login.');
+        // Auto-login after successful registration
+        setTimeout(() => handleLogin(), 1000);
+
     } catch (error) {
         console.error('Registration error:', error);
         showToast(`Registration failed: ${error.message}`);
@@ -229,7 +220,7 @@ function checkAuthStatus() {
     
     if (token && username) {
         // Verify token with server
-        fetch('./api/auth/verify', {
+        fetch(`${BACKEND_URL}/api/auth/verify`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -237,9 +228,8 @@ function checkAuthStatus() {
             }
         })
         .then(response => {
-            const contentType = response.headers.get('content-type');
-            if (!contentType || !contentType.includes('application/json')) {
-                throw new Error('Server returned non-JSON response');
+            if (!response.ok) {
+                throw new Error('Token verification failed');
             }
             return response.json();
         })
@@ -260,8 +250,7 @@ function checkAuthStatus() {
                 showLoginForm();
             }
         })
-        .catch((error) => {
-            console.error('Auth verification error:', error);
+        .catch(() => {
             localStorage.removeItem('authToken');
             localStorage.removeItem('username');
             showLoginForm();
@@ -884,7 +873,7 @@ async function initializeApp() {
     }
 
     // Connect to the backend server with auth token
-    socket = io('https://memochat-backend-production.up.railway.app', {
+    socket = io(BACKEND_URL, {
         transports: ['websocket', 'polling'],
         timeout: 20000,
         forceNew: true,
