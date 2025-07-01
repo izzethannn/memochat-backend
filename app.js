@@ -90,14 +90,20 @@ async function handleLogin() {
         loginBtn.textContent = 'Logging in...';
         loginBtn.disabled = true;
 
-        // Send login request to server
-        const response = await fetch('/api/auth/login', {
+        // FIXED: Use relative URL and better error handling
+        const response = await fetch('./api/auth/login', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({ username, password })
         });
+
+        // Check if response is actually JSON
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+            throw new Error(`Server returned ${response.status}: Expected JSON but got ${contentType}`);
+        }
 
         const data = await response.json();
 
@@ -126,7 +132,7 @@ async function handleLogin() {
         }
     } catch (error) {
         console.error('Login error:', error);
-        showToast('Login failed. Please try again.');
+        showToast(`Login failed: ${error.message}`);
     } finally {
         // Reset button state
         const loginBtn = document.getElementById('loginBtn');
@@ -161,14 +167,20 @@ async function handleRegister() {
         registerBtn.textContent = 'Creating account...';
         registerBtn.disabled = true;
 
-        // Send register request to server
-        const response = await fetch('/api/auth/register', {
+        // FIXED: Use relative URL and better error handling
+        const response = await fetch('./api/auth/register', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({ username, password })
         });
+
+        // Check if response is actually JSON
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+            throw new Error(`Server returned ${response.status}: Expected JSON but got ${contentType}`);
+        }
 
         const data = await response.json();
 
@@ -181,7 +193,7 @@ async function handleRegister() {
         }
     } catch (error) {
         console.error('Registration error:', error);
-        showToast('Registration failed. Please try again.');
+        showToast(`Registration failed: ${error.message}`);
     } finally {
         // Reset button state
         const registerBtn = document.getElementById('registerBtn');
@@ -217,14 +229,20 @@ function checkAuthStatus() {
     
     if (token && username) {
         // Verify token with server
-        fetch('/api/auth/verify', {
+        fetch('./api/auth/verify', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${token}`
             }
         })
-        .then(response => response.json())
+        .then(response => {
+            const contentType = response.headers.get('content-type');
+            if (!contentType || !contentType.includes('application/json')) {
+                throw new Error('Server returned non-JSON response');
+            }
+            return response.json();
+        })
         .then(data => {
             if (data.valid) {
                 isLoggedIn = true;
@@ -242,7 +260,8 @@ function checkAuthStatus() {
                 showLoginForm();
             }
         })
-        .catch(() => {
+        .catch((error) => {
+            console.error('Auth verification error:', error);
             localStorage.removeItem('authToken');
             localStorage.removeItem('username');
             showLoginForm();
