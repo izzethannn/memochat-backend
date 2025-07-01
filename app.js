@@ -135,7 +135,20 @@ function handleKeyDown(event) {
 // ===============================
 // HELPER FUNCTIONS
 // ===============================
-
+function getUserColor(username) {
+    // Generate consistent color for each username
+    let hash = 0;
+    for (let i = 0; i < username.length; i++) {
+        hash = username.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    
+    // Convert to HSL for better color variety
+    const hue = Math.abs(hash) % 360;
+    const saturation = 60 + (Math.abs(hash) % 30); // 60-90% saturation
+    const lightness = 45 + (Math.abs(hash) % 20);  // 45-65% lightness
+    
+    return `hsl(${hue}, ${saturation}%, ${lightness}%)`;
+}
 function getCurrentUserCount() {
     return document.querySelectorAll('.user-item').length;
 }
@@ -2097,8 +2110,11 @@ function addChatMessage(author, content, isSystem = false, isError = false) {
     const now = new Date();
     const timeString = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
+    // Get user color (only for non-system messages)
+    const userColor = isSystem ? '#43b581' : getUserColor(author);
+
     messageDiv.innerHTML = `
-        <div class="message-author">
+        <div class="message-author" style="color: ${userColor};">
             ${author}
             <span class="message-time">${timeString}</span>
         </div>
