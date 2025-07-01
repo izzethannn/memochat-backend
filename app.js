@@ -27,6 +27,18 @@ let messageCount = 0;
 // Captcha variables
 let captchaAnswer = 0;
 
+// ===============================
+// NEW: ENHANCEMENT VARIABLES
+// ===============================
+
+// Track user activity for last seen
+let userLastActivity = new Map();
+let lastSeenInterval = null;
+
+// Keyboard shortcuts variables
+let isSpacePressed = false;
+let isSpaceMuting = false;
+
 // ENHANCED ICE SERVERS with TURN servers for better connectivity
 const ICE_SERVERS = {
     iceServers: [
@@ -56,6 +68,172 @@ const ICE_SERVERS = {
     ],
     iceCandidatePoolSize: 10
 };
+
+// ===============================
+// ENHANCEMENT 1: ROOM MEMBER COUNT IN TITLE
+// ===============================
+
+// Enhanced room title update function
+function updateRoomTitle(roomName, userCount, isPasswordProtected = false) {
+    const roomNames = {
+        'general': '🏠 General Chat',
+        'gaming': '🎮 Gaming',
+        'study': '📚 Study Group',
+        'music': '🎵 Music & Chill',
+        'private': '🔒 Private Room'
+    };
+
+    const displayName = roomNames[roomName] || `🔐 ${roomName}`;
+    const lockIcon = isPasswordProtected ? '🔐 ' : '';
+    const memberText = userCount === 1 ? 'user' : 'users';
+    
+    // Update both title and page title
+    document.getElementById('roomTitle').textContent = `${lockIcon}${displayName} (${userCount} ${memberText})`;
+    document.title = `MemoChat - ${displayName} (${userCount})`;
+}
+
+// ===============================
+// ENHANCEMENT 2: LAST SEEN INDICATOR
+// ===============================
+
+function updateUserActivity(userId) {
+    userLastActivity.set(userId, Date.now());
+}
+
+function getLastSeenText(timestamp) {
+    const now = Date.now();
+    const diff = now - timestamp;
+    
+    if (diff < 60000) return 'Active now';
+    if (diff < 300000) return `Active ${Math.floor(diff / 60000)}m ago`;
+    if (diff < 3600000) return `Active ${Math.floor(diff / 60000)}m ago`;
+    return `Active ${Math.floor(diff / 3600000)}h ago`;
+}
+
+function startLastSeenUpdates() {
+    if (lastSeenInterval) clearInterval(lastSeenInterval);
+    
+    lastSeenInterval = setInterval(() => {
+        document.querySelectorAll('.user-item').forEach(userElement => {
+            const userId = userElement.dataset.userId;
+            const statusElement = userElement.querySelector('.user-status');
+            const lastActivity = userLastActivity.get(userId);
+            
+            if (lastActivity && statusElement && !statusElement.textContent.includes('Muted') && !statusElement.textContent.includes('Sharing')) {
+                statusElement.textContent = getLastSeenText(lastActivity);
+            }
+        });
+    }, 30000); // Update every 30 seconds
+}
+
+function stopLastSeenUpdates() {
+    if (lastSeenInterval) {
+        clearInterval(lastSeenInterval);
+        lastSeenInterval = null;
+    }
+}
+
+// ===============================
+// ENHANCEMENT 3: KEYBOARD SHORTCUTS
+// ===============================
+
+function initializeKeyboardShortcuts() {
+    document.addEventListener('keydown', handleKeyDown);
+    document.addEventListener('keyup', handleKeyUp);
+    
+    // Show keyboard shortcuts hint
+    showToast('💡 Tip: Hold SPACE to toggle mute, ESC to leave, CTRL+S for screen share', 4000);
+}
+
+function handleKeyDown(event) {
+    // Don't trigger shortcuts when typing in inputs
+    if (event.target.matches('input, textarea, [contenteditable]')) {
+        // CTRL+ENTER to send message when in chat input
+        if (event.key === 'Enter' && event.ctrlKey && event.target.id === 'chatInput') {
+            event.preventDefault();
+            sendMessage();
+        }
+        return;
+    }
+    
+    switch(event.key) {
+        case ' ': // Spacebar
+            if (!isSpacePressed && localStream) {
+                event.preventDefault();
+                isSpacePressed = true;
+                isSpaceMuting = true;
+                
+                // Visual feedback
+                const micBtn = document.getElementById('micBtn');
+                if (micBtn) {
+                    micBtn.style.transform = 'scale(0.95)';
+                    micBtn.style.boxShadow = '0 0 15px rgba(114, 137, 218, 0.5)';
+                }
+                
+                toggleMic();
+                showToast('🎤 Space to mute active', 1000);
+            }
+            break;
+            
+        case 'Escape':
+            // ESC to leave room
+            if (currentRoom) {
+                event.preventDefault();
+                if (confirm('Leave the current room?')) {
+                    leaveRoom();
+                }
+            }
+            break;
+            
+        case 's':
+            // S for screen share (when not typing)
+            if (event.ctrlKey && localStream) {
+                event.preventDefault();
+                toggleScreenShare();
+            }
+            break;
+    }
+}
+
+function handleKeyUp(event) {
+    // Don't trigger shortcuts when typing in inputs
+    if (event.target.matches('input, textarea, [contenteditable]')) {
+        return;
+    }
+    
+    if (event.key === ' ' && isSpacePressed && isSpaceMuting) {
+        event.preventDefault();
+        isSpacePressed = false;
+        isSpaceMuting = false;
+        
+        // Remove visual feedback
+        const micBtn = document.getElementById('micBtn');
+        if (micBtn) {
+            micBtn.style.transform = '';
+            micBtn.style.boxShadow = '';
+        }
+        
+        toggleMic();
+        showToast('🎤 Space to mute released', 1000);
+    }
+}
+
+// ===============================
+// HELPER FUNCTIONS
+// ===============================
+
+function getCurrentUserCount() {
+    return document.querySelectorAll('.user-item').length;
+}
+
+function getCurrentRoomName() {
+    // Extract room name from current room variable or title
+    return currentRoom || 'general';
+}
+
+function isCurrentRoomPasswordProtected() {
+    return document.getElementById('roomTitle').textContent.includes('🔐');
+}
 
 // ===============================
 // ENHANCED VALIDATION FUNCTIONS
@@ -1107,7 +1285,7 @@ async function initializeApp() {
         showToast('Private room created! Share the info with friends.');
     });
 
-    // Room and user event handlers
+    // Room and user event handlers - USING ENHANCED VERSIONS
     socket.on('room-joined', handleRoomJoined);
     socket.on('user-joined', handleUserJoined);
     socket.on('user-left', handleUserLeft);
@@ -1206,10 +1384,10 @@ async function joinRoom() {
 }
 
 // ===============================
-// ROOM EVENT HANDLERS
+// ENHANCED ROOM EVENT HANDLERS
 // ===============================
 
-// Handle room joined
+// ENHANCED Handle room joined
 function handleRoomJoined(data) {
     // Update room title with member count
     updateRoomTitle(data.room, data.users.length, data.isPasswordProtected);
@@ -1263,7 +1441,7 @@ function handleRoomJoined(data) {
     initializeKeyboardShortcuts();
 }
 
-// Handle user events
+// ENHANCED Handle user events
 function handleUserJoined(data) {
     console.log('User joined:', data);
     addChatMessage('System', `${data.username} joined the room`, true);
@@ -1669,6 +1847,7 @@ function stopScreenShare() {
     }
 }
 
+// ENHANCED Leave Room Function
 function leaveRoom() {
     if (currentUser && currentRoom) {
         socket.emit('leave-room', {
@@ -2028,25 +2207,12 @@ function clearChat() {
         </div>
     `;
 }
-// Helper Functions
-function getCurrentUserCount() {
-    return document.querySelectorAll('.user-item').length;
-}
-
-function getCurrentRoomName() {
-    // Extract room name from current room variable or title
-    return currentRoom || 'general';
-}
-
-function isCurrentRoomPasswordProtected() {
-    return document.getElementById('roomTitle').textContent.includes('🔐');
-}
 
 // ===============================
-// USER MANAGEMENT FUNCTIONS
+// ENHANCED USER MANAGEMENT FUNCTIONS
 // ===============================
 
-// User Management Functions
+// ENHANCED User Management Functions
 function addUserToList(userData) {
     const usersList = document.getElementById('usersList');
     
@@ -2080,11 +2246,14 @@ function updateUsersList(users) {
         userItem.dataset.userId = user.id;
         userItem.id = `user-${user.id}`;
         
+        // Track user activity
+        updateUserActivity(user.id);
+        
         userItem.innerHTML = `
             <div class="user-avatar">${user.username[0].toUpperCase()}</div>
             <div class="user-info">
                 <div class="user-name">${user.username}${user.id === currentUser.id ? ' (You)' : ''}</div>
-                <div class="user-status">Voice connected</div>
+                <div class="user-status">Active now</div>
             </div>
             <div class="status-indicator status-online"></div>
         `;
@@ -2229,10 +2398,6 @@ document.addEventListener('keypress', function(e) {
     if (e.target.id === 'captchaAnswer' && e.key === 'Enter') {
         if (e.target.closest('#loginScreen')) {
             // Determine which button to trigger based on context
-            const registerBtn = document.getElementById('registerBtn');
-            const loginBtn = document.getElementById('loginBtn');
-            
-            // If password field has content, try login first, otherwise register
             const password = document.getElementById('loginPassword').value.trim();
             if (password.length >= 6) {
                 handleLogin();
