@@ -1211,21 +1211,18 @@ async function joinRoom() {
 
 // Handle room joined
 function handleRoomJoined(data) {
-    const roomNames = {
-        'general': '🏠 General Chat',
-        'gaming': '🎮 Gaming',
-        'study': '📚 Study Group',
-        'music': '🎵 Music & Chill',
-        'private': '🔒 Private Room'
-    };
-
-    const roomName = roomNames[data.room] || `🔐 ${data.room}`;
-    const lockIcon = data.isPasswordProtected ? '🔐 ' : '';
-
-    document.getElementById('roomTitle').textContent = `Room: ${lockIcon}${roomName}`;
-    document.getElementById('roomSubtitle').textContent = `${data.users.length} user(s) connected`;
+    // Update room title with member count
+    updateRoomTitle(data.room, data.users.length, data.isPasswordProtected);
     
     updateUsersList(data.users);
+    
+    // Track all users' activity
+    data.users.forEach(user => {
+        updateUserActivity(user.id);
+    });
+    
+    // Start last seen updates
+    startLastSeenUpdates();
     
     // Clear chat and show message history
     clearChat();
@@ -1261,6 +1258,9 @@ function handleRoomJoined(data) {
     playNotificationSound('join');
     updateConnectionStatus('connected');
     showToast('Joined voice channel!');
+    
+    // Initialize keyboard shortcuts
+    initializeKeyboardShortcuts();
 }
 
 // Handle user events
@@ -1270,10 +1270,13 @@ function handleUserJoined(data) {
     playNotificationSound('join');
     showToast(`${data.username} joined`);
     
-    // Update user count in subtitle
-    const currentCount = document.getElementById('roomSubtitle').textContent;
-    const newCount = parseInt(currentCount.match(/\d+/)[0]) + 1;
-    document.getElementById('roomSubtitle').textContent = `${newCount} user(s) connected`;
+    // Update room title with new count
+    const currentCount = getCurrentUserCount() + 1;
+    const roomName = getCurrentRoomName();
+    updateRoomTitle(roomName, currentCount, isCurrentRoomPasswordProtected());
+    
+    // Track user activity
+    updateUserActivity(data.userId);
     
     // Add user to the list
     addUserToList(data);
@@ -1310,10 +1313,13 @@ function handleUserLeft(data) {
         userElement.remove();
     }
     
-    // Update user count
-    const currentCount = document.getElementById('roomSubtitle').textContent;
-    const newCount = Math.max(1, parseInt(currentCount.match(/\d+/)[0]) - 1);
-    document.getElementById('roomSubtitle').textContent = `${newCount} user(s) connected`;
+    // Update room title with new count
+    const currentCount = Math.max(1, getCurrentUserCount() - 1);
+    const roomName = getCurrentRoomName();
+    updateRoomTitle(roomName, currentCount, isCurrentRoomPasswordProtected());
+    
+    // Remove from activity tracking
+    userLastActivity.delete(data.userId);
     
     addChatMessage('System', `${data.username} left the room`, true);
     playNotificationSound('leave');
@@ -1690,6 +1696,13 @@ function leaveRoom() {
 
     // Clean up voice chat
     cleanupVoiceChat();
+    
+    // Stop last seen updates
+    stopLastSeenUpdates();
+    
+    // Remove keyboard shortcuts
+    document.removeEventListener('keydown', handleKeyDown);
+    document.removeEventListener('keyup', handleKeyUp);
 
     // Reset UI
     document.getElementById('joinForm').style.display = 'block';
@@ -1701,7 +1714,7 @@ function leaveRoom() {
     document.getElementById('screenBtn').disabled = true;
     document.getElementById('leaveBtn').disabled = true;
     document.getElementById('roomTitle').textContent = 'Welcome to MemoChat';
-    document.getElementById('roomSubtitle').textContent = 'Enter your name to get started';
+    document.title = 'MemoChat - Voice & Screen Share'; // Reset page title
 
     // Hide mobile nav
     document.getElementById('mobileNav').style.display = 'none';
@@ -2015,6 +2028,19 @@ function clearChat() {
         </div>
     `;
 }
+// Helper Functions
+function getCurrentUserCount() {
+    return document.querySelectorAll('.user-item').length;
+}
+
+function getCurrentRoomName() {
+    // Extract room name from current room variable or title
+    return currentRoom || 'general';
+}
+
+function isCurrentRoomPasswordProtected() {
+    return document.getElementById('roomTitle').textContent.includes('🔐');
+}
 
 // ===============================
 // USER MANAGEMENT FUNCTIONS
@@ -2029,11 +2055,14 @@ function addUserToList(userData) {
     userItem.dataset.userId = userData.userId;
     userItem.id = `user-${userData.userId}`;
     
+    // Track user activity
+    updateUserActivity(userData.userId);
+    
     userItem.innerHTML = `
         <div class="user-avatar">${userData.username[0].toUpperCase()}</div>
         <div class="user-info">
             <div class="user-name">${userData.username}</div>
-            <div class="user-status">Voice connected</div>
+            <div class="user-status">Active now</div>
         </div>
         <div class="status-indicator status-online"></div>
     `;
