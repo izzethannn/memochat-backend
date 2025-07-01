@@ -38,6 +38,16 @@ body {
 .main-content.active {
     display: flex;
 }
+.logout-btn {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 1001;
+    padding: 8px 16px !important;
+    font-size: 12px !important;
+    min-width: auto !important;
+    flex: none !important;
+}
 
 @media (min-width: 768px) {
     .sidebar {
@@ -62,6 +72,29 @@ body {
     .content-area {
         flex-direction: row;
         gap: 20px;
+    }
+}
+@media (max-width: 768px) {
+    .logout-btn {
+        top: 10px;
+        right: 10px;
+        padding: 6px 12px !important;
+        font-size: 11px !important;
+    }
+    
+    .header {
+        margin-right: 80px; /* Less space on mobile */
+    }
+    
+    /* Stack controls vertically on very small screens */
+    .controls {
+        flex-direction: column;
+        gap: 6px;
+    }
+    
+    .controls .btn {
+        flex: none;
+        width: 100%;
     }
 }
 
@@ -204,6 +237,7 @@ body {
     background: rgba(0, 0, 0, 0.2);
     padding: 12px 15px;
     border-radius: 10px;
+    margin-right: 100px; /* Space for logout button */
     margin-bottom: 15px;
     display: flex;
     flex-direction: column;
