@@ -526,27 +526,66 @@ function checkAuthStatus() {
 // AUDIO CONTEXT INITIALIZATION
 // ===============================
 
-// FIXED: Initialize Web Audio Context for input volume control
+// ENHANCED: Audio context with intelligent click suppression
 async function initializeAudioContext() {
     try {
         audioContext = new (window.AudioContext || window.webkitAudioContext)();
         
         if (localStream) {
             const source = audioContext.createMediaStreamSource(localStream);
+            
+            // Create enhanced noise reduction chain
             gainNode = audioContext.createGain();
+            
+            // 1. High-pass filter (remove low rumbles)
+            const highPassFilter = audioContext.createBiquadFilter();
+            highPassFilter.type = 'highpass';
+            highPassFilter.frequency.setValueAtTime(100, audioContext.currentTime);
+            
+            // 2. Notch filter for keyboard frequency (around 2-4kHz)
+            const notchFilter = audioContext.createBiquadFilter();
+            notchFilter.type = 'notch';
+            notchFilter.frequency.setValueAtTime(3000, audioContext.currentTime); // Target keyboard clicks
+            notchFilter.Q.setValueAtTime(2, audioContext.currentTime); // Narrow notch
+            
+            // 3. AGGRESSIVE compressor for click suppression
+            const compressor = audioContext.createDynamicsCompressor();
+            compressor.threshold.setValueAtTime(-30, audioContext.currentTime); // Lower threshold
+            compressor.knee.setValueAtTime(40, audioContext.currentTime);      // Softer knee
+            compressor.ratio.setValueAtTime(20, audioContext.currentTime);     // High ratio
+            compressor.attack.setValueAtTime(0.001, audioContext.currentTime); // VERY fast attack
+            compressor.release.setValueAtTime(0.1, audioContext.currentTime);  // Fast release
+            
+            // 4. Secondary compressor for final limiting
+            const limiter = audioContext.createDynamicsCompressor();
+            limiter.threshold.setValueAtTime(-6, audioContext.currentTime);
+            limiter.knee.setValueAtTime(5, audioContext.currentTime);
+            limiter.ratio.setValueAtTime(20, audioContext.currentTime);
+            limiter.attack.setValueAtTime(0.0001, audioContext.currentTime); // Instant attack
+            limiter.release.setValueAtTime(0.05, audioContext.currentTime);
+            
+            // 5. Low-pass filter (remove very high frequencies)
+            const lowPassFilter = audioContext.createBiquadFilter();
+            lowPassFilter.type = 'lowpass';
+            lowPassFilter.frequency.setValueAtTime(7000, audioContext.currentTime);
+            
             const destination = audioContext.createMediaStreamDestination();
             
-            source.connect(gainNode);
+            // Connect the click-suppression chain
+            source.connect(highPassFilter);
+            highPassFilter.connect(notchFilter);      // Remove keyboard frequencies
+            notchFilter.connect(compressor);          // Aggressive compression
+            compressor.connect(limiter);              // Final limiting
+            limiter.connect(lowPassFilter);           // Smooth high end
+            lowPassFilter.connect(gainNode);          // Volume control
             gainNode.connect(destination);
             
-            // Replace the original stream with the processed one
+            // Replace stream
             const audioTrack = destination.stream.getAudioTracks()[0];
             const videoTracks = localStream.getVideoTracks();
-            
-            // Create new stream with processed audio
             const processedStream = new MediaStream([audioTrack, ...videoTracks]);
             
-            // Update all peer connections with the new stream
+            // Update peer connections
             Object.values(peerConnections).forEach(pc => {
                 const sender = pc.getSenders().find(s => s.track && s.track.kind === 'audio');
                 if (sender) {
@@ -555,10 +594,12 @@ async function initializeAudioContext() {
             });
             
             localStream = processedStream;
-            console.log('✅ Audio context initialized for input volume control');
+            console.log('✅ Click suppression and noise reduction active');
+            showToast('🎤 Advanced noise reduction with click suppression enabled!');
         }
     } catch (error) {
-        console.warn('⚠️ Could not initialize audio context:', error);
+        console.warn('⚠️ Could not initialize enhanced audio context:', error);
+        showToast('⚠️ Using basic noise reduction');
     }
 }
 
