@@ -138,7 +138,61 @@
     <div class="container" id="mainApp" style="display: none;">
         <!-- Logout Button -->
         <button class="btn btn-danger logout-btn" onclick="logout()">🚪 Logout</button>
+        <!-- Settings Button -->
+<button class="btn btn-primary settings-btn" onclick="openSettings()">⚙️ Settings</button>
 
+<!-- Settings Modal -->
+<div class="settings-modal" id="settingsModal" style="display: none;">
+    <div class="settings-content">
+        <div class="settings-header">
+            <h3>🎛️ Audio Settings</h3>
+            <button class="btn btn-danger" onclick="closeSettings()">✕</button>
+        </div>
+        
+        <div class="settings-body">
+            <!-- Microphone Selection -->
+            <div class="setting-group">
+                <label>🎤 Microphone:</label>
+                <select id="microphoneSelect">
+                    <option value="">Loading microphones...</option>
+                </select>
+                <button class="btn btn-secondary" onclick="refreshDevices()">🔄 Refresh</button>
+            </div>
+            
+            <!-- Noise Gate Sensitivity -->
+            <div class="setting-group">
+                <label>🔇 Noise Gate Sensitivity:</label>
+                <input type="range" id="sensitivitySlider" min="0.005" max="0.1" step="0.005" value="0.02">
+                <span id="sensitivityValue">0.02</span>
+                <small>Lower = more sensitive (picks up quieter sounds)</small>
+            </div>
+            
+            <!-- Gate Release Time -->
+            <div class="setting-group">
+                <label>⏱️ Gate Release Time (ms):</label>
+                <input type="range" id="releaseTimeSlider" min="100" max="1000" step="50" value="300">
+                <span id="releaseTimeValue">300ms</span>
+                <small>How long gate stays open after you stop talking</small>
+            </div>
+            
+            <!-- Test Area -->
+            <div class="setting-group">
+                <label>🧪 Test Your Settings:</label>
+                <button class="btn btn-success" onclick="testMicrophone()" id="testMicBtn">🎤 Test Microphone</button>
+                <div id="audioLevelMeter" style="width: 100%; height: 20px; background: #333; border-radius: 10px; margin-top: 10px;">
+                    <div id="audioLevelBar" style="height: 100%; background: linear-gradient(90deg, green, yellow, red); border-radius: 10px; width: 0%; transition: width 0.1s;"></div>
+                </div>
+            </div>
+            
+            <!-- Save/Cancel -->
+            <div class="setting-group">
+                <button class="btn btn-success" onclick="saveSettings()">💾 Save Settings</button>
+                <button class="btn btn-secondary" onclick="resetToDefaults()">🔄 Reset to Defaults</button>
+            </div>
+        </div>
+    </div>
+</div>
+        
         <div class="sidebar" id="sidebar">
             <div class="room-info">
                 <h2>📝 MemoChat</h2>
