@@ -526,7 +526,7 @@ function checkAuthStatus() {
 // AUDIO CONTEXT INITIALIZATION
 // ===============================
 
-// ENHANCED: Audio context with intelligent click suppression
+// ENHANCED: Audio context with noise gate for click suppression
 async function initializeAudioContext() {
     try {
         audioContext = new (window.AudioContext || window.webkitAudioContext)();
@@ -534,7 +534,6 @@ async function initializeAudioContext() {
         if (localStream) {
             const source = audioContext.createMediaStreamSource(localStream);
             
-            // Create enhanced noise reduction chain
             gainNode = audioContext.createGain();
             
             // 1. High-pass filter (remove low rumbles)
@@ -542,42 +541,64 @@ async function initializeAudioContext() {
             highPassFilter.type = 'highpass';
             highPassFilter.frequency.setValueAtTime(100, audioContext.currentTime);
             
-            // 2. Notch filter for keyboard frequency (around 2-4kHz)
-            const notchFilter = audioContext.createBiquadFilter();
-            notchFilter.type = 'notch';
-            notchFilter.frequency.setValueAtTime(3000, audioContext.currentTime); // Target keyboard clicks
-            notchFilter.Q.setValueAtTime(2, audioContext.currentTime); // Narrow notch
-            
-            // 3. AGGRESSIVE compressor for click suppression
+            // 2. Compressor for general noise reduction
             const compressor = audioContext.createDynamicsCompressor();
-            compressor.threshold.setValueAtTime(-30, audioContext.currentTime); // Lower threshold
-            compressor.knee.setValueAtTime(40, audioContext.currentTime);      // Softer knee
-            compressor.ratio.setValueAtTime(20, audioContext.currentTime);     // High ratio
-            compressor.attack.setValueAtTime(0.001, audioContext.currentTime); // VERY fast attack
-            compressor.release.setValueAtTime(0.1, audioContext.currentTime);  // Fast release
+            compressor.threshold.setValueAtTime(-24, audioContext.currentTime);
+            compressor.knee.setValueAtTime(30, audioContext.currentTime);
+            compressor.ratio.setValueAtTime(12, audioContext.currentTime);
+            compressor.attack.setValueAtTime(0.003, audioContext.currentTime);
+            compressor.release.setValueAtTime(0.25, audioContext.currentTime);
             
-            // 4. Secondary compressor for final limiting
-            const limiter = audioContext.createDynamicsCompressor();
-            limiter.threshold.setValueAtTime(-6, audioContext.currentTime);
-            limiter.knee.setValueAtTime(5, audioContext.currentTime);
-            limiter.ratio.setValueAtTime(20, audioContext.currentTime);
-            limiter.attack.setValueAtTime(0.0001, audioContext.currentTime); // Instant attack
-            limiter.release.setValueAtTime(0.05, audioContext.currentTime);
-            
-            // 5. Low-pass filter (remove very high frequencies)
+            // 3. Low-pass filter
             const lowPassFilter = audioContext.createBiquadFilter();
             lowPassFilter.type = 'lowpass';
             lowPassFilter.frequency.setValueAtTime(7000, audioContext.currentTime);
             
+            // 4. NOISE GATE - This is the key part for click suppression!
+            const scriptProcessor = audioContext.createScriptProcessor(2048, 1, 1);
+            let gateOpen = false;
+            let gateLevel = 0;
+            const gateThreshold = 0.02;    // Adjust this: higher = less sensitive
+            const attackTime = 10;         // How fast gate opens (ms)
+            const releaseTime = 300;       // How fast gate closes (ms)
+            
+            scriptProcessor.onaudioprocess = function(audioProcessingEvent) {
+                const inputBuffer = audioProcessingEvent.inputBuffer;
+                const outputBuffer = audioProcessingEvent.outputBuffer;
+                const inputData = inputBuffer.getChannelData(0);
+                const outputData = outputBuffer.getChannelData(0);
+                
+                for (let i = 0; i < inputData.length; i++) {
+                    const sample = Math.abs(inputData[i]);
+                    
+                    // Calculate average level over small window
+                    const avgLevel = sample * 0.1 + gateLevel * 0.9;
+                    gateLevel = avgLevel;
+                    
+                    // Gate logic: open if sustained audio above threshold
+                    if (avgLevel > gateThreshold) {
+                        gateOpen = true;
+                    } else if (avgLevel < gateThreshold * 0.3) {
+                        gateOpen = false;
+                    }
+                    
+                    // Apply gate with smooth transitions
+                    const targetGain = gateOpen ? 1.0 : 0.05; // 5% when closed
+                    const currentGain = outputData[i-1] ? Math.abs(outputData[i-1] / inputData[i-1]) : targetGain;
+                    const smoothGain = currentGain * 0.95 + targetGain * 0.05;
+                    
+                    outputData[i] = inputData[i] * smoothGain;
+                }
+            };
+            
             const destination = audioContext.createMediaStreamDestination();
             
-            // Connect the click-suppression chain
+            // Connect the audio chain WITH noise gate
             source.connect(highPassFilter);
-            highPassFilter.connect(notchFilter);      // Remove keyboard frequencies
-            notchFilter.connect(compressor);          // Aggressive compression
-            compressor.connect(limiter);              // Final limiting
-            limiter.connect(lowPassFilter);           // Smooth high end
-            lowPassFilter.connect(gainNode);          // Volume control
+            highPassFilter.connect(compressor);
+            compressor.connect(lowPassFilter);
+            lowPassFilter.connect(scriptProcessor);    // ← NOISE GATE HERE
+            scriptProcessor.connect(gainNode);         // ← THEN VOLUME CONTROL
             gainNode.connect(destination);
             
             // Replace stream
@@ -594,8 +615,8 @@ async function initializeAudioContext() {
             });
             
             localStream = processedStream;
-            console.log('✅ Click suppression and noise reduction active');
-            showToast('🎤 Advanced noise reduction with click suppression enabled!');
+            console.log('✅ Noise gate and audio processing active');
+            showToast('🎤 Noise gate enabled - clicks should be suppressed!');
         }
     } catch (error) {
         console.warn('⚠️ Could not initialize enhanced audio context:', error);
