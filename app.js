@@ -558,9 +558,9 @@ async function initializeAudioContext() {
             const scriptProcessor = audioContext.createScriptProcessor(2048, 1, 1);
             let gateOpen = false;
             let gateLevel = 0;
-            const gateThreshold = 0.02;    // Adjust this: higher = less sensitive
+            const gateThreshold = currentSettings.gateThreshold;    // Use setting instead of hardcoded
             const attackTime = 10;         // How fast gate opens (ms)
-            const releaseTime = 300;       // How fast gate closes (ms)
+            const releaseTime = currentSettings.releaseTime;       // Use setting instead of hardcoded
             
             scriptProcessor.onaudioprocess = function(audioProcessingEvent) {
                 const inputBuffer = audioProcessingEvent.inputBuffer;
@@ -1341,17 +1341,20 @@ async function joinRoom() {
     try {
         updateConnectionStatus('connecting');
         
-        // Get user media for group voice chat
-        localStream = await navigator.mediaDevices.getUserMedia({ 
+        // Get user media with selected microphone and enhanced settings
+        const constraints = {
             audio: {
+                deviceId: currentSettings.microphoneId ? { exact: currentSettings.microphoneId } : undefined,
                 echoCancellation: true,
                 noiseSuppression: true,
                 autoGainControl: true
             }, 
             video: false 
-        });
+        };
 
-        // Initialize audio context for input volume control
+        localStream = await navigator.mediaDevices.getUserMedia(constraints);
+
+        // Initialize audio context for input volume control and noise reduction
         await initializeAudioContext();
 
         // Update current user info
@@ -2291,6 +2294,184 @@ function clearVideoGrid() {
     `;
 }
 
+// Settings variables
+let availableMicrophones = [];
+let currentSettings = {
+    microphoneId: null,
+    gateThreshold: 0.02,
+    releaseTime: 300
+};
+let testStream = null;
+let audioLevelInterval = null;
+
+// Load settings from localStorage
+function loadSettings() {
+    const saved = localStorage.getItem('memoChatSettings');
+    if (saved) {
+        currentSettings = { ...currentSettings, ...JSON.parse(saved) };
+    }
+}
+
+// Save settings to localStorage
+function saveSettingsToStorage() {
+    localStorage.setItem('memoChatSettings', JSON.stringify(currentSettings));
+}
+
+// Open settings modal
+async function openSettings() {
+    document.getElementById('settingsModal').style.display = 'flex';
+    await loadMicrophones();
+    updateSettingsUI();
+}
+
+// Close settings modal
+function closeSettings() {
+    document.getElementById('settingsModal').style.display = 'none';
+    if (testStream) {
+        testStream.getTracks().forEach(track => track.stop());
+        testStream = null;
+    }
+    if (audioLevelInterval) {
+        clearInterval(audioLevelInterval);
+        audioLevelInterval = null;
+    }
+}
+
+// Load available microphones
+async function loadMicrophones() {
+    try {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        availableMicrophones = devices.filter(device => device.kind === 'audioinput');
+        
+        const select = document.getElementById('microphoneSelect');
+        select.innerHTML = '<option value="">Default Microphone</option>';
+        
+        availableMicrophones.forEach(mic => {
+            const option = document.createElement('option');
+            option.value = mic.deviceId;
+            option.textContent = mic.label || `Microphone ${availableMicrophones.indexOf(mic) + 1}`;
+            select.appendChild(option);
+        });
+        
+        // Set current selection
+        select.value = currentSettings.microphoneId || '';
+        
+    } catch (error) {
+        console.error('Error loading microphones:', error);
+        showToast('❌ Could not load microphone list');
+    }
+}
+
+// Refresh device list
+async function refreshDevices() {
+    await loadMicrophones();
+    showToast('🔄 Device list refreshed');
+}
+
+// Update settings UI with current values
+function updateSettingsUI() {
+    document.getElementById('sensitivitySlider').value = currentSettings.gateThreshold;
+    document.getElementById('sensitivityValue').textContent = currentSettings.gateThreshold;
+    
+    document.getElementById('releaseTimeSlider').value = currentSettings.releaseTime;
+    document.getElementById('releaseTimeValue').textContent = currentSettings.releaseTime + 'ms';
+    
+    // Add event listeners for real-time updates
+    document.getElementById('sensitivitySlider').oninput = function() {
+        document.getElementById('sensitivityValue').textContent = this.value;
+    };
+    
+    document.getElementById('releaseTimeSlider').oninput = function() {
+        document.getElementById('releaseTimeValue').textContent = this.value + 'ms';
+    };
+}
+
+// Test microphone with audio level meter
+async function testMicrophone() {
+    const testBtn = document.getElementById('testMicBtn');
+    const levelBar = document.getElementById('audioLevelBar');
+    
+    if (testStream) {
+        // Stop testing
+        testStream.getTracks().forEach(track => track.stop());
+        testStream = null;
+        clearInterval(audioLevelInterval);
+        testBtn.textContent = '🎤 Test Microphone';
+        testBtn.className = 'btn btn-success';
+        levelBar.style.width = '0%';
+        return;
+    }
+    
+    try {
+        const micId = document.getElementById('microphoneSelect').value;
+        const constraints = {
+            audio: {
+                deviceId: micId ? { exact: micId } : undefined,
+                echoCancellation: true,
+                noiseSuppression: true,
+                autoGainControl: true
+            }
+        };
+        
+        testStream = await navigator.mediaDevices.getUserMedia(constraints);
+        testBtn.textContent = '⏹️ Stop Test';
+        testBtn.className = 'btn btn-danger';
+        
+        // Create audio level monitoring
+        const audioContext = new AudioContext();
+        const source = audioContext.createMediaStreamSource(testStream);
+        const analyser = audioContext.createAnalyser();
+        analyser.fftSize = 256;
+        source.connect(analyser);
+        
+        const dataArray = new Uint8Array(analyser.frequencyBinCount);
+        
+        audioLevelInterval = setInterval(() => {
+            analyser.getByteFrequencyData(dataArray);
+            const average = dataArray.reduce((a, b) => a + b) / dataArray.length;
+            const percentage = Math.min(100, (average / 128) * 100);
+            levelBar.style.width = percentage + '%';
+        }, 100);
+        
+        showToast('🎤 Testing microphone - speak to see levels');
+        
+    } catch (error) {
+        console.error('Error testing microphone:', error);
+        showToast('❌ Could not access microphone');
+    }
+}
+
+// Save settings and apply them
+function saveSettings() {
+    currentSettings.microphoneId = document.getElementById('microphoneSelect').value || null;
+    currentSettings.gateThreshold = parseFloat(document.getElementById('sensitivitySlider').value);
+    currentSettings.releaseTime = parseInt(document.getElementById('releaseTimeSlider').value);
+    
+    saveSettingsToStorage();
+    
+    // If in a room, restart audio with new settings
+    if (currentRoom && localStream) {
+        showToast('🔄 Applying new audio settings...');
+        setTimeout(() => {
+            initializeAudioContext();
+        }, 500);
+    }
+    
+    closeSettings();
+    showToast('💾 Settings saved successfully!');
+}
+
+// Reset to default settings
+function resetToDefaults() {
+    currentSettings = {
+        microphoneId: null,
+        gateThreshold: 0.02,
+        releaseTime: 300
+    };
+    updateSettingsUI();
+    showToast('🔄 Settings reset to defaults');
+}
+
 // ===============================
 // DEBUG AND MONITORING FUNCTIONS
 // ===============================
@@ -2366,6 +2547,7 @@ function startConnectionHealthMonitoring() {
 
 // Event Listeners
 document.addEventListener('DOMContentLoaded', () => {
+    loadSettings(); // ← ADD THIS LINE
     checkAuthStatus();
     startConnectionHealthMonitoring();
     
