@@ -1,13 +1,33 @@
-# 📝 MemoChat v2.1
+# 📝 MemoChat v2.1.1
 
-A real-time voice chat and screen sharing application built with Node.js, Socket.IO, and WebRTC. Now with enhanced security, user authentication, volume controls, and advanced spam protection!
+A real-time voice chat and screen sharing application built with Node.js, Socket.IO, and WebRTC. Now with enhanced security, user authentication, volume controls, advanced spam protection, and **Docker support**!
 
 ![MemoChat Demo](https://img.shields.io/badge/Status-Live-brightgreen)
 ![Node.js](https://img.shields.io/badge/Node.js-v18+-blue)
 ![Socket.IO](https://img.shields.io/badge/Socket.IO-v4.7-red)
 ![Security](https://img.shields.io/badge/Security-Enhanced-green)
+![Docker](https://img.shields.io/badge/Docker-Ready-blue)
 
-## ✨ New Features in v2.1
+## 🎉 What's New in v2.1.1
+
+### 🐳 **Docker Support**
+- **Dockerfile included** - Deploy anywhere with Docker
+- **Optimized builds** - Multi-stage builds with health checks
+- **Ready for cloud** - Works with AWS, GCP, Azure, DigitalOcean
+
+### 🚀 **Enhanced Deployment**
+- **Auto-detecting backend URL** - No more hardcoded URLs!
+- **Free hosting guides** - Detailed guides for Render, Fly.io, Cyclic
+- **Multiple deployment options** - Choose what works best for you
+- **Production-ready configuration** - Proper .env setup and security
+
+### 🔧 **Developer Experience**
+- **Environment variable support** - Proper dotenv configuration
+- **Protected sensitive files** - .gitignore included
+- **Template files** - .env.example for easy setup
+- **Comprehensive docs** - DEPLOYMENT.md with step-by-step guides
+
+## ✨ Features in v2.1
 
 ### 🔐 **Enhanced Authentication System**
 - **User Registration & Login**: Secure account creation with JWT tokens
@@ -74,7 +94,17 @@ cd memochat-backend
 npm install
 ```
 
-3. **Configure environment** (create `.env` file)
+3. **Configure environment**
+```bash
+# Copy the example environment file
+cp .env.example .env
+
+# Edit .env and update with your values:
+# - Change JWT_SECRET to a secure random string (32+ characters)
+# - Adjust other settings as needed
+```
+
+Example `.env` configuration:
 ```env
 PORT=3001
 NODE_ENV=development
@@ -98,7 +128,7 @@ npm start
 
 ## 🌐 Demo
 
-Try the live demo: [Your Railway URL here]
+Ready to deploy your own instance? Check out the [deployment guides](DEPLOYMENT.md) for free hosting options!
 
 ## 🎯 How to Use
 
@@ -146,10 +176,12 @@ Try the live demo: [Your Railway URL here]
 - **Backend:** Node.js, Express.js
 - **Authentication:** JWT, bcrypt
 - **Real-time:** Socket.IO
-- **Voice/Video:** WebRTC with STUN servers
+- **Voice/Video:** WebRTC with STUN/TURN servers
 - **Security:** Helmet, CORS, Rate Limiting, CAPTCHA, Password Protection
 - **Frontend:** HTML5, CSS3, Vanilla JavaScript
 - **Audio Processing:** Web Audio API
+- **Deployment:** Docker, Dockerfile with health checks
+- **Environment:** dotenv for configuration management
 
 ## 📡 API Endpoints
 
@@ -229,11 +261,66 @@ Try the live demo: [Your Railway URL here]
 
 ## 🚢 Deployment
 
-### Railway (Recommended)
-1. Connect your GitHub repository
-2. Set environment variables including `JWT_SECRET`
-3. Deploy automatically
-4. Get your live URL
+MemoChat is **deployment-ready** with multiple options! Full deployment guides available in [DEPLOYMENT.md](DEPLOYMENT.md).
+
+### 🐳 Docker Deployment (Recommended)
+
+#### Build and Run Locally
+```bash
+# Build Docker image
+npm run docker:build
+
+# Run container
+npm run docker:run
+
+# Or manually
+docker build -t memochat-backend .
+docker run -p 3001:3001 --env-file .env memochat-backend
+```
+
+#### Deploy to Any Cloud Platform
+The included `Dockerfile` makes it easy to deploy to:
+- Docker Hub → Any cloud provider
+- AWS ECS/EKS
+- Google Cloud Run
+- Azure Container Instances
+- DigitalOcean App Platform
+
+### 🆓 Free Hosting Platforms
+
+#### Render (Easiest for Beginners) ⭐
+- **750 hours/month free**
+- Auto-SSL, auto-deploys
+- Sleeps after 15 min inactivity
+1. Go to [render.com](https://render.com)
+2. Connect your GitHub repository
+3. Deploy automatically!
+
+#### Fly.io (Best Performance)
+- **3 shared VMs free**
+- Always-on, great performance
+```bash
+# Install Fly CLI (Windows)
+powershell -Command "iwr https://fly.io/install.ps1 -useb | iex"
+
+# Deploy
+fly launch
+fly deploy
+```
+
+#### Cyclic (Unlimited Free)
+- **Unlimited free tier**
+- Perfect for Node.js apps
+1. Visit [cyclic.sh](https://www.cyclic.sh)
+2. Connect GitHub repository
+3. Deploy instantly!
+
+#### Other Options
+- **Oracle Cloud:** Always free tier (2 VMs)
+- **AWS EC2:** 750 hours/month free (12 months)
+- **DigitalOcean:** $200 credit for 60 days
+
+**📖 See [DEPLOYMENT.md](DEPLOYMENT.md) for detailed step-by-step guides for each platform!**
 
 ### Environment Variables for Production
 ```env
@@ -246,36 +333,58 @@ RATE_LIMIT_MAX_REQUESTS=100
 RATE_LIMIT_WINDOW_MS=900000
 ```
 
-### Other Platforms
-- **Render:** Free tier available with persistent storage
-- **Heroku:** Paid hosting with add-ons
-- **Google Cloud:** Student credits available
-- **DigitalOcean:** App platform deployment
+### 🔧 Auto-Detecting Backend URL
+The frontend automatically detects whether it's running locally or in production:
+- **Local development:** Connects to `http://localhost:3001`
+- **Production:** Connects to the same origin (wherever deployed)
+
+No need to hardcode backend URLs!
 
 ## 🧪 Testing
 
+### Local Testing
 ```bash
-# Test the backend
-node test_server.js
-
 # Run with development auto-restart
 npm run dev
 
-# Test authentication system
-# - Create new account with various passwords
-# - Test CAPTCHA functionality
-# - Verify token persistence
+# Normal start
+npm start
 
-# Test security features
-# - Try weak passwords (should fail)
-# - Test reserved usernames (should fail)
-# - Attempt rapid message sending (should throttle)
-
-# Test room functionality
-# - Create password-protected rooms
-# - Try joining with wrong password
-# - Verify access control works
+# Test health endpoint
+curl http://localhost:3001/api/health
 ```
+
+### Docker Testing
+```bash
+# Build and run in Docker
+npm run docker:build
+npm run docker:run
+
+# Access at http://localhost:3001
+```
+
+### Feature Testing Checklist
+- ✅ **Authentication:**
+  - Create account with various passwords
+  - Test CAPTCHA functionality
+  - Verify token persistence
+  - Test login/logout flow
+
+- ✅ **Security:**
+  - Try weak passwords (should fail)
+  - Test reserved usernames (should fail)
+  - Attempt rapid message sending (should throttle)
+
+- ✅ **Rooms:**
+  - Create password-protected rooms
+  - Try joining with wrong password
+  - Verify access control works
+
+- ✅ **Voice & Screen Sharing:**
+  - Test microphone access
+  - Test screen sharing
+  - Test volume controls
+  - Verify WebRTC connections
 
 ## 🤝 Contributing
 
@@ -310,30 +419,55 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - [ ] **Two-Factor Authentication** for enhanced security
 - [ ] **Audit Logs** for security monitoring
 
-## 🆕 Version 2.1 Changelog
+## 🆕 Changelog
 
-### 🔐 Security Enhancements Added
+### Version 2.1.1 (Latest)
+**🐳 Docker & Deployment Update**
+
+#### Added
+- ✅ **Docker Support**: Complete Dockerfile with health checks and multi-stage build
+- ✅ **Auto-detecting Backend URL**: No more hardcoded URLs, automatically detects environment
+- ✅ **Deployment Guides**: Comprehensive DEPLOYMENT.md with free hosting options
+- ✅ **Security Files**: .gitignore to protect sensitive data
+- ✅ **Environment Templates**: .env.example for easy setup
+- ✅ **Enhanced Configuration**: Proper dotenv integration in server.js
+
+#### Improved
+- ✅ **Deployment Options**: Added guides for Render, Fly.io, Cyclic, and more
+- ✅ **Developer Experience**: Better documentation and easier setup process
+- ✅ **Production Ready**: Optimized for deployment on any cloud platform
+
+#### Fixed
+- ✅ **Environment Variables**: Now properly loaded via dotenv
+- ✅ **Backend URL**: Removed hardcoded Railway URL, now environment-aware
+
+---
+
+### Version 2.1
+**🔐 Security & Authentication Update**
+
+#### Security Enhancements
 - **User Authentication System**: Complete registration and login flow
-- **JWT Token Management**: Secure session handling with auto-expiry
+- **JWT Token Management**: Secure session handling with 24-hour expiry
 - **Enhanced Password Validation**: 8+ character requirements with complexity rules
 - **Math CAPTCHA System**: Dynamic anti-bot protection
 - **Advanced Username Validation**: Comprehensive rules and reserved word protection
 - **Session Persistence**: Users stay logged in across browser sessions
 
-### 🎨 UI/UX Improvements
+#### UI/UX Improvements
 - **Enhanced Login Screen**: Professional authentication interface
 - **Real-time Validation**: Instant feedback on form inputs
 - **CAPTCHA Integration**: Seamless math problem verification
 - **Better Error Messages**: Clear, specific validation feedback
 - **Security Indicators**: Visual feedback for password strength
 
-### 🛡️ Security Hardening
+#### Security Hardening
 - **Rate Limiting Enhancement**: Multiple layers of protection
 - **Input Sanitization**: Advanced validation for all user inputs
 - **Token Verification**: Server-side authentication for all operations
 - **Session Security**: Automatic cleanup and token management
 
-### 🐛 Bug Fixes from v2.0
+#### Bug Fixes from v2.0
 - **Screen sharing connection stability** improved
 - **Mobile responsive design** enhanced
 - **Audio element management** optimized
@@ -354,7 +488,8 @@ If you discover a security vulnerability, please send an email to [security@your
 
 - Socket.IO team for real-time capabilities
 - WebRTC community for voice/video foundations
-- Railway for easy deployment
+- Docker community for containerization standards
+- Render, Fly.io, and Cyclic for free hosting options
 - JWT.io for authentication standards
 - bcrypt team for secure password hashing
 - All contributors and testers
@@ -366,38 +501,70 @@ If you discover a security vulnerability, please send an email to [security@your
 
 ⭐ **Star this repo if you found the enhanced security features helpful!** ⭐
 
-## 🚀 Upgrade from v2.0
+## 🚀 Upgrade Guide
 
-If you're upgrading from v2.0 to v2.1:
+### From v2.1 to v2.1.1
+Simple update - just pull the latest changes:
 
-### Required Changes
-1. **Update app.js**: Replace with the new enhanced version
+```bash
+# Pull latest changes
+git pull origin main
+
+# Install any new dependencies (already installed)
+npm install
+
+# Update your .env if needed
+cp .env.example .env.new
+# Compare .env.new with your .env and add any missing variables
+
+# Restart server
+npm restart
+
+# Optional: Test Docker build
+npm run docker:build
+```
+
+**What's New:**
+- ✅ Docker support (optional, use if you want containerization)
+- ✅ Auto-detecting backend URLs (no code changes needed)
+- ✅ Enhanced deployment guides in DEPLOYMENT.md
+- ✅ Better environment configuration
+
+### From v2.0 to v2.1+
+Major update with authentication system:
+
+**Required Changes:**
+1. **Update all files**: Pull the entire new codebase
 2. **Environment Variables**: Add `JWT_SECRET` and `BCRYPT_ROUNDS`
-3. **Database Preparation**: Consider adding persistent storage for users
-4. **Frontend Updates**: HTML includes new login screen and CAPTCHA elements
+3. **Frontend Updates**: New login screen and CAPTCHA elements included
 
-### Migration Steps
+**Migration Steps:**
 ```bash
 # 1. Backup your current version
-cp app.js app.js.backup
+cp -r . ../memochat-backup
 
-# 2. Update app.js with new enhanced version
+# 2. Pull new version
+git pull origin main
+
 # 3. Update environment variables
-echo "JWT_SECRET=your-32-character-secret-key-here" >> .env
-echo "BCRYPT_ROUNDS=10" >> .env
+cp .env.example .env
+# Edit .env and add:
+# JWT_SECRET=your-32-character-secret-key-here
+# BCRYPT_ROUNDS=10
 
-# 4. Restart server
+# 4. Install new dependencies
+npm install
+
+# 5. Restart server
 npm restart
 ```
 
-### New User Experience
-- Users will see a login screen on first visit
+**New User Experience:**
+- Users see a login screen on first visit
 - Registration requires username/password + CAPTCHA
-- Existing anonymous sessions will need to create accounts
 - All features remain the same after authentication
 
-### Compatibility Notes
-- Existing rooms will continue to work
-- Volume controls and screen sharing unchanged
-- New authentication layer is required for access
-- Mobile experience improved with responsive login
+**Compatibility:**
+- ✅ Existing rooms continue to work
+- ✅ Volume controls and screen sharing unchanged
+- ⚠️ Authentication layer now required for access
