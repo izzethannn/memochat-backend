@@ -1,5 +1,8 @@
 // Global variables
-const BACKEND_URL = 'https://memochat-backend-production.up.railway.app'; 
+// Auto-detect backend URL based on environment
+const BACKEND_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+    ? 'http://localhost:3001'  // Local development
+    : window.location.origin;  // Production (same origin) 
 let localStream = null;
 let screenStream = null;
 let socket = null;
