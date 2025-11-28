@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MemoChat - Modern Voice & Chat</title>
+    <script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
+    <!-- Google Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+    <!-- Login Screen -->
+    <div class="login-screen" id="loginScreen">
+        <div class="login-container">
+            <h1>📝 MemoChat</h1>
+            <p>Secure voice chat with enhanced features</p>
+
+            <div class="login-form">
+                <input type="text" id="loginUsername" placeholder="Username (3-15 characters)" maxlength="15"
+                    autocomplete="username">
+                <input type="password" id="loginPassword" placeholder="Password (8+ chars, mixed case, number, symbol)"
+                    maxlength="50" autocomplete="current-password">
+
+                <!-- CAPTCHA Section -->
+                <div class="captcha-section">
+                    <label for="captchaAnswer"
+                        style="color: rgba(255, 255, 255, 0.9); font-size: 14px; margin-bottom: 8px; display: block;">
+                        🔢 Anti-spam: What is <span id="captchaQuestion">5 + 3</span>?
+                    </label>
+                    <div style="display: flex; gap: 10px; align-items: center;">
+                        <input type="number" id="captchaAnswer" placeholder="Answer" style="flex: 1;" required>
+                        <button type="button" onclick="refreshCaptcha()" class="btn btn-primary"
+                            style="padding: 15px 12px; font-size: 14px; min-width: auto;">🔄</button>
+                    </div>
+                </div>
+
+                <div class="login-buttons">
+                    <button class="btn btn-primary" id="loginBtn" onclick="handleLogin()">Login</button>
+                    <button class="btn btn-success" id="registerBtn" onclick="handleRegister()">Create Account</button>
+                </div>
+            </div>
+
+            <div style="margin-top: 20px; font-size: 12px; opacity: 0.7;">
+                <p><strong>New users:</strong> Create an account to get started</p>
+                <p><strong>Password requirements:</strong> 8+ characters, mixed case, number, symbol</p>
+                <p><strong>Username rules:</strong> 3-15 characters, letters/numbers/underscore/hyphen only</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div class="settings-modal" id="settingsModal" style="display: none;">
+        <div class="settings-content">
+            <div class="settings-header">
+                <h3>🎛️ Audio Settings</h3>
+                <button class="btn btn-danger" onclick="closeSettings()">✕</button>
+            </div>
+
+            <div class="settings-body">
+                <!-- Volume Controls -->
+                <div class="setting-group">
+                    <label>🔊 Input Volume:</label>
+                    <input type="range" id="inputVolume" min="0" max="100" value="100"
+                        oninput="updateInputVolume(this.value)">
+                    <span id="inputVolumeValue">100%</span>
+                </div>
+                <div class="setting-group">
+                    <label>🔊 Output Volume:</label>
+                    <input type="range" id="outputVolume" min="0" max="100" value="100"
+                        oninput="updateOutputVolume(this.value)">
+                    <span id="outputVolumeValue">100%</span>
+                </div>
+                <!-- Microphone Selection -->
+                <div class="setting-group">
+                    <label>🎤 Microphone:</label>
+                    <select id="microphoneSelect">
+                        <option value="">Loading microphones...</option>
+                    </select>
+                    <button class="btn btn-secondary" onclick="refreshDevices()">🔄 Refresh</button>
+                </div>
+
+                <!-- Noise Gate Sensitivity -->
+                <div class="setting-group">
+                    <label>🔇 Noise Gate Sensitivity:</label>
+                    <input type="range" id="sensitivitySlider" min="0.005" max="0.1" step="0.005" value="0.02">
+                    <span id="sensitivityValue">0.02</span>
+                    <small>Lower = more sensitive (picks up quieter sounds)</small>
+                </div>
+
+                <!-- Gate Release Time -->
+                <div class="setting-group">
+                    <label>⏱️ Gate Release Time (ms):</label>
+                    <input type="range" id="releaseTimeSlider" min="100" max="1000" step="50" value="300">
+                    <span id="releaseTimeValue">300ms</span>
+                    <small>How long gate stays open after you stop talking</small>
+                </div>
+
+                <!-- Test Area -->
+                <div class="setting-group">
+                    <label>🧪 Test Your Settings:</label>
+                    <button class="btn btn-success" onclick="testMicrophone()" id="testMicBtn">🎤 Test
+                        Microphone</button>
+                    <div id="audioLevelMeter"
+                        style="width: 100%; height: 20px; background: #333; border-radius: 10px; margin-top: 10px;">
+                        <div id="audioLevelBar"
+                            style="height: 100%; background: linear-gradient(90deg, green, yellow, red); border-radius: 10px; width: 0%; transition: width 0.1s;">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Save/Cancel -->
+                <div class="setting-group">
+                    <button class="btn btn-success" onclick="saveSettings()">💾 Save Settings</button>
+                    <button class="btn btn-secondary" onclick="resetToDefaults()">🔄 Reset to Defaults</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Application -->
+    <div class="container" id="mainApp" style="display: none;">
+        <div class="sidebar" id="sidebar">
+            <div class="room-info">
+                <h2>📝 MemoChat</h2>
+                <p>Memorable voice chat with enhanced features</p>
+            </div>
+
+            <div class="join-form" id="joinForm">
+                <input type="text" id="usernameInput" placeholder="Enter your name" maxlength="20" readonly>
+                <select id="roomSelect" onchange="handleRoomChange()">
+                    <option value="">Choose a room...</option>
+                    <option value="general">🏠 General Chat</option>
+                    <option value="gaming">🎮 Gaming</option>
+                    <option value="study">📚 Study Group</option>
+                    <option value="music">🎵 Music & Chill</option>
+                    <option value="private">🔒 Private Room</option>
+                    <option value="custom">🔐 Password Protected</option>
+                </select>
+                <input type="password" id="passwordInput" class="password-input" placeholder="Enter room password"
+                    maxlength="50">
+                <input type="text" id="customRoomInput" class="password-input" placeholder="Custom room ID (optional)"
+                    maxlength="20">
+                <button class="btn btn-primary" onclick="joinRoom()" style="width: 100%;">Join Voice Chat</button>
+                <button class="btn btn-success create-room-btn" onclick="createPrivateRoom()"
+                    style="display: none;">Create Password Protected Room</button>
+            </div>
+
+            <div class="password-section" id="passwordSection" style="display: none;">
+                <h4 style="color: #43b581; margin-bottom: 10px;">🔐 Create Private Room</h4>
+                <input type="text" id="privateUsername" placeholder="Your name" maxlength="20">
+                <input type="password" id="privatePassword" placeholder="Set password (min 4 chars)" maxlength="50">
+                <button class="btn btn-success" onclick="createPrivateRoom()" style="width: 100%;">Create Room</button>
+            </div>
+
+            <div class="room-id-display" id="roomIdDisplay" style="display: none;">
+                <h4>Room Created!</h4>
+                <p style="font-size: 11px; margin-bottom: 5px;">Share this info with friends:</p>
+                <div class="room-id-text" id="roomIdText"></div>
+                <button class="btn btn-primary" onclick="copyRoomInfo()"
+                    style="width: 100%; margin-top: 8px; font-size: 11px;">Copy Room Info</button>
+            </div>
+
+            <div class="voice-controls" id="voiceControls" style="display: none;">
+                <h4>🎤 Group Voice Chat</h4>
+                <p id="voiceStatus">Connected to voice channel</p>
+                <p style="font-size: 11px; opacity: 0.7; margin-top: 5px;">Everyone can hear each other</p>
+            </div>
+
+            <div class="users-list" id="usersList">
+                <div style="text-align: center; opacity: 0.6; margin-top: 30px;">
+                    Join a room to see other users
+                </div>
+            </div>
+
+            <!-- Global Buttons at bottom of sidebar -->
+            <div class="sidebar-footer">
+                <button class="btn btn-primary" onclick="openSettings()" style="display: none;" id="settingsBtn">
+                    ⚙️ Settings
+                </button>
+                <button class="btn btn-danger" onclick="logout()" style="display: none;" id="logoutBtn">
+                    🚪 Logout
+                </button>
+            </div>
+        </div>
+
+        <div class="main-content" id="mainContent">
+            <div class="header">
+                <div class="header-info">
+                    <h3 id="roomTitle">Welcome to MemoChat</h3>
+                    <small id="roomSubtitle">Enter your name to get started</small>
+                </div>
+                <div class="controls">
+                    <button class="btn btn-success" id="micBtn" onclick="toggleMic()" disabled>
+                        🎤 Mic
+                    </button>
+                    <button class="btn btn-primary" id="screenBtn" onclick="toggleScreenShare()" disabled>
+                        📺 Screen
+                    </button>
+                    <button class="btn btn-danger" id="leaveBtn" onclick="leaveRoom()" disabled>
+                        🚪 Leave
+                    </button>
+                </div>
+            </div>
+
+            <div class="content-area" id="contentArea" style="display: none;">
+                <div class="video-section">
+                    <div class="video-grid" id="videoGrid">
+                        <div
+                            style="display: flex; align-items: center; justify-content: center; height: 200px; opacity: 0.6;">
+                            <div style="text-align: center;">
+                                <h3 style="font-size: 16px; margin-bottom: 10px;">🎙️ Group Voice Chat</h3>
+                                <p style="font-size: 13px;">Everyone in the room can hear each other</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="chat-section">
+                    <div class="chat-header">
+                        💬 Chat
+                    </div>
+                    <div class="chat-messages" id="chatMessages">
+                        <div class="message system-message">
+                            <div class="message-author">System</div>
+                            <div class="message-content">Welcome! Join a room to start chatting.</div>
+                        </div>
+                    </div>
+                    <div class="chat-input-area">
+                        <input type="text" class="chat-input" id="chatInput" placeholder="Type a message..."
+                            maxlength="500">
+                        <button class="chat-send-btn" onclick="sendMessage()">Send</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="video-grid" id="welcomeScreen">
+                <div style="display: flex; align-items: center; justify-content: center; height: 250px; opacity: 0.6;">
+                    <div style="text-align: center;">
+                        <h3 style="font-size: 18px; margin-bottom: 10px;">🎙️ Group Voice Chat Ready</h3>
+                        <p style="font-size: 14px;">Join a room to start talking with friends</p>
+                        <p style="margin-top: 15px; font-size: 13px; opacity: 0.8;">
+                            ✨ Features: Volume controls, Password protection, Screen sharing
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Mobile Navigation -->
+    <div class="mobile-nav" id="mobileNav">
+        <button class="mobile-nav-btn" onclick="toggleMobileView()">
+            <span id="mobileNavText">Show Chat</span>
+        </button>
+    </div>
+
+    <!-- Toast for notifications -->
+    <div class="toast" id="toast"></div>
+
+    <div class="connection-status status-disconnected" id="connectionStatus">
+        Disconnected
+    </div>
+
+    <script src="app.js"></script>
+</body>
+
+</html>

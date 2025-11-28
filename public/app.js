@@ -39,7 +39,7 @@ const ICE_SERVERS = {
         { urls: 'stun:stun2.l.google.com:19302' },
         { urls: 'stun:stun3.l.google.com:19302' },
         { urls: 'stun:stun4.l.google.com:19302' },
-        
+
         // Free TURN servers for better connectivity
         {
             urls: 'turn:openrelay.metered.ca:80',
@@ -77,7 +77,7 @@ function updateRoomTitle(roomName, userCount, isPasswordProtected = false) {
     const displayName = roomNames[roomName] || `🔐 ${roomName}`;
     const lockIcon = isPasswordProtected ? '🔐 ' : '';
     const memberText = userCount === 1 ? 'user' : 'users';
-    
+
     // Update both title and page title
     document.getElementById('roomTitle').textContent = `${lockIcon}${displayName} (${userCount} ${memberText})`;
     document.title = `MemoChat - ${displayName} (${userCount})`;
@@ -89,7 +89,7 @@ function updateRoomTitle(roomName, userCount, isPasswordProtected = false) {
 
 function initializeKeyboardShortcuts() {
     document.addEventListener('keydown', handleKeyDown);
-    
+
     // Show keyboard shortcuts hint
     showToast('💡 Tip: CTRL+M to mute, CTRL+L to leave, CTRL+S for screen share', 4000);
 }
@@ -104,8 +104,8 @@ function handleKeyDown(event) {
         }
         return;
     }
-    
-    switch(event.key) {
+
+    switch (event.key) {
         case 'm':
             // CTRL+M to toggle mute
             if (event.ctrlKey && localStream) {
@@ -114,7 +114,7 @@ function handleKeyDown(event) {
                 showToast('🎤 CTRL+M mute toggled', 1000);
             }
             break;
-            
+
         case 'l':
             // CTRL+L to leave room
             if (event.ctrlKey && currentRoom) {
@@ -124,7 +124,7 @@ function handleKeyDown(event) {
                 }
             }
             break;
-            
+
         case 's':
             // CTRL+S for screen share
             if (event.ctrlKey && localStream) {
@@ -144,12 +144,12 @@ function getUserColor(username) {
     for (let i = 0; i < username.length; i++) {
         hash = username.charCodeAt(i) + ((hash << 5) - hash);
     }
-    
+
     // Convert to HSL for better color variety
     const hue = Math.abs(hash) % 360;
     const saturation = 60 + (Math.abs(hash) % 30); // 60-90% saturation
     const lightness = 45 + (Math.abs(hash) % 20);  // 45-65% lightness
-    
+
     return `hsl(${hue}, ${saturation}%, ${lightness}%)`;
 }
 function getCurrentUserCount() {
@@ -172,31 +172,31 @@ function isCurrentRoomPasswordProtected() {
 // 1. STRONGER PASSWORD VALIDATION
 function validatePassword(password) {
     const errors = [];
-    
+
     if (password.length < 8) {
         errors.push("at least 8 characters");
     }
-    
+
     if (!/[A-Z]/.test(password)) {
         errors.push("one uppercase letter");
     }
-    
+
     if (!/[a-z]/.test(password)) {
         errors.push("one lowercase letter");
     }
-    
+
     if (!/\d/.test(password)) {
         errors.push("one number");
     }
-    
+
     if (!/[!@#$%^&*(),.?":{}|<>-_]/.test(password)) {
         errors.push("one special character (!@#$%^&* etc.)");
     }
-    
+
     if (errors.length > 0) {
         return `Password must contain: ${errors.join(", ")}`;
     }
-    
+
     return null; // Valid password
 }
 
@@ -206,10 +206,10 @@ function generateCaptcha() {
     const num2 = Math.floor(Math.random() * 10) + 1; // 1-10
     const operations = ['+', '-', '*'];
     const operation = operations[Math.floor(Math.random() * operations.length)];
-    
+
     let question, answer;
-    
-    switch(operation) {
+
+    switch (operation) {
         case '+':
             question = `${num1} + ${num2}`;
             answer = num1 + num2;
@@ -229,7 +229,7 @@ function generateCaptcha() {
             answer = small1 * small2;
             break;
     }
-    
+
     captchaAnswer = answer;
     const captchaElement = document.getElementById('captchaQuestion');
     if (captchaElement) {
@@ -244,7 +244,7 @@ function generateCaptcha() {
 function validateCaptcha() {
     const captchaAnswerElement = document.getElementById('captchaAnswer');
     if (!captchaAnswerElement) return false;
-    
+
     const userAnswer = parseInt(captchaAnswerElement.value);
     return userAnswer === captchaAnswer;
 }
@@ -255,28 +255,28 @@ function validateUsername(username) {
     if (username.length < 3 || username.length > 15) {
         return "Username must be 3-15 characters long";
     }
-    
+
     // Check valid characters (letters, numbers, underscore, hyphen only)
     if (!/^[a-zA-Z0-9_-]+$/.test(username)) {
         return "Username can only contain letters, numbers, underscore (_) and hyphen (-)";
     }
-    
+
     // Cannot be all numbers
     if (/^[0-9]+$/.test(username)) {
         return "Username cannot be all numbers";
     }
-    
+
     // Cannot start with number
     if (/^[0-9]/.test(username)) {
         return "Username cannot start with a number";
     }
-    
+
     // Check for reserved words
     const reservedWords = ['admin', 'system', 'root', 'user', 'guest', 'test', 'null', 'undefined', 'memochat'];
     if (reservedWords.includes(username.toLowerCase())) {
         return "This username is reserved and cannot be used";
     }
-    
+
     return null; // Valid username
 }
 
@@ -298,6 +298,10 @@ function showLoginForm() {
 function showMainApp() {
     document.getElementById('loginScreen').style.display = 'none';
     document.getElementById('mainApp').style.display = 'flex';
+
+    // Show global controls
+    document.getElementById('logoutBtn').style.display = 'flex';
+    document.getElementById('settingsBtn').style.display = 'flex';
 }
 
 // UPDATED REGISTRATION FUNCTION with enhanced validation
@@ -355,12 +359,12 @@ async function handleRegister() {
         const data = await response.json();
 
         showToast('Account created successfully! Please login.');
-        
+
         // Clear form and generate new captcha
         document.getElementById('loginUsername').value = '';
         document.getElementById('loginPassword').value = '';
         generateCaptcha();
-        
+
         // Auto-focus login for convenience
         setTimeout(() => {
             document.getElementById('loginUsername').focus();
@@ -430,7 +434,7 @@ async function handleLogin() {
         // Store auth token
         localStorage.setItem('authToken', data.token);
         localStorage.setItem('username', username);
-        
+
         isLoggedIn = true;
         currentUser = {
             id: data.userId,
@@ -440,10 +444,10 @@ async function handleLogin() {
 
         // Pre-fill username in main form
         document.getElementById('usernameInput').value = username;
-        
+
         showMainApp();
         showToast('Login successful!');
-        
+
         // Initialize socket connection after login
         await initializeApp();
 
@@ -462,19 +466,24 @@ function logout() {
     localStorage.removeItem('authToken');
     localStorage.removeItem('username');
     isLoggedIn = false;
-    
+
     // Clean up current session
     if (currentRoom) {
         leaveRoom();
     }
-    
+
     // Disconnect socket
     if (socket) {
         socket.disconnect();
     }
-    
+
     currentUser = null;
     showLoginForm();
+
+    // Hide global controls
+    document.getElementById('logoutBtn').style.display = 'none';
+    document.getElementById('settingsBtn').style.display = 'none';
+
     showToast('Logged out successfully');
 }
 
@@ -482,7 +491,7 @@ function logout() {
 function checkAuthStatus() {
     const token = localStorage.getItem('authToken');
     const username = localStorage.getItem('username');
-    
+
     if (token && username) {
         // Verify token with server
         fetch(`${BACKEND_URL}/api/auth/verify`, {
@@ -492,34 +501,34 @@ function checkAuthStatus() {
                 'Authorization': `Bearer ${token}`
             }
         })
-        .then(response => {
-            if (!response.ok) {
-                throw new Error('Token verification failed');
-            }
-            return response.json();
-        })
-        .then(data => {
-            if (data.valid) {
-                isLoggedIn = true;
-                currentUser = {
-                    id: data.userId,
-                    name: username,
-                    token: token
-                };
-                document.getElementById('usernameInput').value = username;
-                showMainApp();
-                initializeApp();
-            } else {
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Token verification failed');
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.valid) {
+                    isLoggedIn = true;
+                    currentUser = {
+                        id: data.userId,
+                        name: username,
+                        token: token
+                    };
+                    document.getElementById('usernameInput').value = username;
+                    showMainApp();
+                    initializeApp();
+                } else {
+                    localStorage.removeItem('authToken');
+                    localStorage.removeItem('username');
+                    showLoginForm();
+                }
+            })
+            .catch(() => {
                 localStorage.removeItem('authToken');
                 localStorage.removeItem('username');
                 showLoginForm();
-            }
-        })
-        .catch(() => {
-            localStorage.removeItem('authToken');
-            localStorage.removeItem('username');
-            showLoginForm();
-        });
+            });
     } else {
         showLoginForm();
     }
@@ -533,17 +542,17 @@ function checkAuthStatus() {
 async function initializeAudioContext() {
     try {
         audioContext = new (window.AudioContext || window.webkitAudioContext)();
-        
+
         if (localStream) {
             const source = audioContext.createMediaStreamSource(localStream);
-            
+
             gainNode = audioContext.createGain();
-            
+
             // 1. High-pass filter (remove low rumbles)
             const highPassFilter = audioContext.createBiquadFilter();
             highPassFilter.type = 'highpass';
             highPassFilter.frequency.setValueAtTime(100, audioContext.currentTime);
-            
+
             // 2. Compressor for general noise reduction
             const compressor = audioContext.createDynamicsCompressor();
             compressor.threshold.setValueAtTime(-24, audioContext.currentTime);
@@ -551,12 +560,12 @@ async function initializeAudioContext() {
             compressor.ratio.setValueAtTime(12, audioContext.currentTime);
             compressor.attack.setValueAtTime(0.003, audioContext.currentTime);
             compressor.release.setValueAtTime(0.25, audioContext.currentTime);
-            
+
             // 3. Low-pass filter
             const lowPassFilter = audioContext.createBiquadFilter();
             lowPassFilter.type = 'lowpass';
             lowPassFilter.frequency.setValueAtTime(7000, audioContext.currentTime);
-            
+
             // 4. NOISE GATE - This is the key part for click suppression!
             const scriptProcessor = audioContext.createScriptProcessor(2048, 1, 1);
             let gateOpen = false;
@@ -564,38 +573,38 @@ async function initializeAudioContext() {
             const gateThreshold = currentSettings.gateThreshold;    // Use setting instead of hardcoded
             const attackTime = 10;         // How fast gate opens (ms)
             const releaseTime = currentSettings.releaseTime;       // Use setting instead of hardcoded
-            
-            scriptProcessor.onaudioprocess = function(audioProcessingEvent) {
+
+            scriptProcessor.onaudioprocess = function (audioProcessingEvent) {
                 const inputBuffer = audioProcessingEvent.inputBuffer;
                 const outputBuffer = audioProcessingEvent.outputBuffer;
                 const inputData = inputBuffer.getChannelData(0);
                 const outputData = outputBuffer.getChannelData(0);
-                
+
                 for (let i = 0; i < inputData.length; i++) {
                     const sample = Math.abs(inputData[i]);
-                    
+
                     // Calculate average level over small window
                     const avgLevel = sample * 0.1 + gateLevel * 0.9;
                     gateLevel = avgLevel;
-                    
+
                     // Gate logic: open if sustained audio above threshold
                     if (avgLevel > gateThreshold) {
                         gateOpen = true;
                     } else if (avgLevel < gateThreshold * 0.3) {
                         gateOpen = false;
                     }
-                    
+
                     // Apply gate with smooth transitions
                     const targetGain = gateOpen ? 1.0 : 0.05; // 5% when closed
-                    const currentGain = outputData[i-1] ? Math.abs(outputData[i-1] / inputData[i-1]) : targetGain;
+                    const currentGain = outputData[i - 1] ? Math.abs(outputData[i - 1] / inputData[i - 1]) : targetGain;
                     const smoothGain = currentGain * 0.95 + targetGain * 0.05;
-                    
+
                     outputData[i] = inputData[i] * smoothGain;
                 }
             };
-            
+
             const destination = audioContext.createMediaStreamDestination();
-            
+
             // Connect the audio chain WITH noise gate
             source.connect(highPassFilter);
             highPassFilter.connect(compressor);
@@ -603,12 +612,12 @@ async function initializeAudioContext() {
             lowPassFilter.connect(scriptProcessor);    // ← NOISE GATE HERE
             scriptProcessor.connect(gainNode);         // ← THEN VOLUME CONTROL
             gainNode.connect(destination);
-            
+
             // Replace stream
             const audioTrack = destination.stream.getAudioTracks()[0];
             const videoTracks = localStream.getVideoTracks();
             const processedStream = new MediaStream([audioTrack, ...videoTracks]);
-            
+
             // Update peer connections
             Object.values(peerConnections).forEach(pc => {
                 const sender = pc.getSenders().find(s => s.track && s.track.kind === 'audio');
@@ -616,7 +625,7 @@ async function initializeAudioContext() {
                     sender.replaceTrack(audioTrack);
                 }
             });
-            
+
             localStream = processedStream;
             console.log('✅ Noise gate and audio processing active');
             showToast('🎤 Noise gate enabled - clicks should be suppressed!');
@@ -636,12 +645,12 @@ async function processQueuedCandidates(peerConnection, senderId, isScreenShare) 
     if (!peerConnection.pendingIceCandidates || peerConnection.pendingIceCandidates.length === 0) {
         return;
     }
-    
+
     console.log(`📦 Processing ${peerConnection.pendingIceCandidates.length} queued ICE candidates for ${senderId}`);
-    
+
     const candidates = [...peerConnection.pendingIceCandidates];
     peerConnection.pendingIceCandidates = [];
-    
+
     for (const candidate of candidates) {
         try {
             if (peerConnection.remoteDescription && peerConnection.signalingState !== 'closed') {
@@ -652,7 +661,7 @@ async function processQueuedCandidates(peerConnection, senderId, isScreenShare) 
             console.warn(`⚠️ Failed to add queued ICE candidate for ${senderId}:`, error.message);
         }
     }
-    
+
     // Clear timeout
     if (peerConnection.candidateTimeout) {
         clearTimeout(peerConnection.candidateTimeout);
@@ -664,31 +673,31 @@ async function processQueuedCandidates(peerConnection, senderId, isScreenShare) 
 async function handleWebRTCIceCandidate(data) {
     try {
         const { candidate, senderId, isScreenShare } = data;
-        
+
         console.log(`🧊 Received ICE candidate from ${senderId} (${isScreenShare ? 'screen' : 'voice'})`);
-        
+
         // Get the correct peer connection based on type
         let peerConnection = null;
-        
+
         if (isScreenShare) {
             peerConnection = screenShareConnections[senderId] || screenPeerConnections[senderId];
         } else {
             peerConnection = peerConnections[senderId];
         }
-        
+
         if (!peerConnection) {
             console.warn(`⚠️ No peer connection found for ICE candidate from ${senderId} (${isScreenShare ? 'screen' : 'voice'})`);
             return;
         }
-        
+
         // CRITICAL: Check if the peer connection is in a valid state
         if (peerConnection.signalingState === 'closed') {
             console.warn(`⚠️ Peer connection is closed, ignoring ICE candidate from ${senderId}`);
             return;
         }
-        
+
         // Check if remote description is set AND connection is stable
-        if (peerConnection.remoteDescription && 
+        if (peerConnection.remoteDescription &&
             (peerConnection.signalingState === 'stable' || peerConnection.signalingState === 'have-remote-offer')) {
             try {
                 await peerConnection.addIceCandidate(candidate);
@@ -700,13 +709,13 @@ async function handleWebRTCIceCandidate(data) {
         } else {
             console.warn(`⚠️ Remote description not ready for ${senderId}, queuing ICE candidate`);
             console.log(`Signaling state: ${peerConnection.signalingState}, Remote desc: ${!!peerConnection.remoteDescription}`);
-            
+
             // Queue the candidate for later
             if (!peerConnection.pendingIceCandidates) {
                 peerConnection.pendingIceCandidates = [];
             }
             peerConnection.pendingIceCandidates.push(candidate);
-            
+
             // Set a timeout to process queued candidates if remote description takes too long
             if (!peerConnection.candidateTimeout) {
                 peerConnection.candidateTimeout = setTimeout(() => {
@@ -715,7 +724,7 @@ async function handleWebRTCIceCandidate(data) {
                 }, 5000);
             }
         }
-        
+
     } catch (error) {
         console.error('❌ Error handling ICE candidate:', error);
         // Don't throw the error to prevent crashes
@@ -730,20 +739,20 @@ async function handleWebRTCOffer(data) {
             callerName: data.callerName,
             isScreenShare: data.isScreenShare
         });
-        
+
         const { offer, callerId, isScreenShare, callerName } = data;
-        
+
         // Check if we already have a connection for this user and type
-        const existingConnection = isScreenShare ? 
-            (screenShareConnections[callerId] || screenPeerConnections[callerId]) : 
+        const existingConnection = isScreenShare ?
+            (screenShareConnections[callerId] || screenPeerConnections[callerId]) :
             peerConnections[callerId];
-            
+
         if (existingConnection) {
             console.log(`🔄 Closing existing ${isScreenShare ? 'screen' : 'voice'} connection for ${callerName}`);
-            
+
             // Clean up existing connection properly
             existingConnection.close();
-            
+
             // Clean up queued candidates and timeouts
             if (existingConnection.pendingIceCandidates) {
                 delete existingConnection.pendingIceCandidates;
@@ -752,7 +761,7 @@ async function handleWebRTCOffer(data) {
                 clearTimeout(existingConnection.candidateTimeout);
                 delete existingConnection.candidateTimeout;
             }
-            
+
             // Remove from appropriate collection
             if (isScreenShare) {
                 delete screenShareConnections[callerId];
@@ -761,14 +770,14 @@ async function handleWebRTCOffer(data) {
                 delete peerConnections[callerId];
             }
         }
-        
+
         // Create new peer connection with enhanced configuration
         const peerConnection = new RTCPeerConnection({
             ...ICE_SERVERS,
             bundlePolicy: 'balanced',
             rtcpMuxPolicy: 'require'
         });
-        
+
         // Store in appropriate connection object
         if (isScreenShare) {
             screenPeerConnections[callerId] = peerConnection;
@@ -777,7 +786,7 @@ async function handleWebRTCOffer(data) {
             peerConnections[callerId] = peerConnection;
             console.log(`🎤 Created voice connection for ${callerName}`);
         }
-        
+
         // Add local stream only if we have one and it's not screen share receive
         if (!isScreenShare && localStream) {
             localStream.getTracks().forEach(track => {
@@ -785,17 +794,17 @@ async function handleWebRTCOffer(data) {
                 peerConnection.addTrack(track, localStream);
             });
         }
-        
+
         // Handle incoming stream
         peerConnection.ontrack = (event) => {
             console.log(`📥 Received ${isScreenShare ? 'screen' : 'voice'} track from ${callerName}`);
             const [remoteStream] = event.streams;
-            
+
             if (isScreenShare) {
                 console.log('🖥️ Displaying remote screen share');
                 // FIXED: Use unique IDs to prevent conflicts
                 addScreenShareElement(`screen-${callerId}-${Date.now()}`, `${callerName}'s Screen`, remoteStream);
-                
+
                 // Verify the stream has video
                 const videoTracks = remoteStream.getVideoTracks();
                 console.log(`Screen share has ${videoTracks.length} video tracks`);
@@ -811,7 +820,7 @@ async function handleWebRTCOffer(data) {
                 connectedUsers.add(callerId);
             }
         };
-        
+
         // Handle ICE candidates with queueing
         peerConnection.onicecandidate = (event) => {
             if (event.candidate) {
@@ -825,46 +834,46 @@ async function handleWebRTCOffer(data) {
                 console.log(`✅ ICE gathering complete for ${isScreenShare ? 'screen' : 'voice'} with ${callerName}`);
             }
         };
-        
+
         // Enhanced connection state monitoring
         peerConnection.onconnectionstatechange = () => {
             const state = peerConnection.connectionState;
             console.log(`🔄 ${isScreenShare ? 'Screen' : 'Voice'} connection state with ${callerName}:`, state);
-            
+
             if (state === 'failed' || state === 'closed') {
                 console.log(`💔 Connection ${state} with ${callerName}, cleaning up`);
                 cleanupPeerConnection(peerConnection, callerId, isScreenShare);
             }
         };
-        
+
         peerConnection.oniceconnectionstatechange = () => {
             const state = peerConnection.iceConnectionState;
             console.log(`🧊 ICE connection state with ${callerName}:`, state);
-            
+
             if (state === 'failed') {
                 console.log(`❌ ICE connection failed with ${callerName}, attempting restart`);
                 peerConnection.restartIce();
             }
         };
-        
+
         // Set remote description and create answer
         await peerConnection.setRemoteDescription(offer);
-        
+
         // Process any queued ICE candidates after setting remote description
         await processQueuedCandidates(peerConnection, callerId, isScreenShare);
-        
+
         const answer = await peerConnection.createAnswer();
         await peerConnection.setLocalDescription(answer);
-        
+
         socket.emit('webrtc-answer', {
             targetUserId: callerId,
             answer: answer,
             answererId: currentUser.id,
             isScreenShare: isScreenShare
         });
-        
+
         console.log(`✅ ${isScreenShare ? 'Screen share' : 'Voice'} answer sent to ${callerName}`);
-        
+
     } catch (error) {
         console.error('❌ Error handling WebRTC offer:', error);
         showToast('Connection error occurred');
@@ -879,25 +888,25 @@ async function handleWebRTCAnswer(data) {
             answererName: data.answererName,
             isScreenShare: data.isScreenShare
         });
-        
+
         const { answer, answererId, isScreenShare, answererName } = data;
-        
+
         // Get the correct peer connection
-        const peerConnection = isScreenShare ? 
-            screenShareConnections[answererId] || screenPeerConnections[answererId] : 
+        const peerConnection = isScreenShare ?
+            screenShareConnections[answererId] || screenPeerConnections[answererId] :
             peerConnections[answererId];
-        
+
         if (peerConnection) {
             await peerConnection.setRemoteDescription(answer);
-            
+
             // Process any queued ICE candidates after setting remote description
             await processQueuedCandidates(peerConnection, answererId, isScreenShare);
-            
+
             console.log(`✅ ${isScreenShare ? 'Screen share' : 'Voice'} connection established with ${answererName}`);
         } else {
             console.error(`❌ No peer connection found for answer from ${answererId} (${isScreenShare ? 'screen' : 'voice'})`);
         }
-        
+
     } catch (error) {
         console.error('❌ Error handling WebRTC answer:', error);
     }
@@ -914,7 +923,7 @@ function cleanupPeerConnection(peerConnection, userId, isScreenShare) {
         if (peerConnection.pendingIceCandidates) {
             delete peerConnection.pendingIceCandidates;
         }
-        
+
         // FIXED: Only remove specific screen share elements, not all
         if (isScreenShare) {
             // Remove all screen share elements for this user
@@ -923,7 +932,7 @@ function cleanupPeerConnection(peerConnection, userId, isScreenShare) {
         } else {
             removeVoiceElement(userId);
         }
-        
+
         // Remove from connection objects
         if (isScreenShare) {
             delete screenShareConnections[userId];
@@ -931,9 +940,9 @@ function cleanupPeerConnection(peerConnection, userId, isScreenShare) {
         } else {
             delete peerConnections[userId];
         }
-        
+
         connectedUsers.delete(userId);
-        
+
     } catch (error) {
         console.error('Error cleaning up peer connection:', error);
     }
@@ -954,14 +963,14 @@ async function setupScreenShareWithUser(userId) {
             console.log('🔄 Closing existing screen share connection');
             cleanupPeerConnection(screenShareConnections[userId], userId, true);
         }
-        
+
         // Create a completely separate peer connection for screen sharing
         const screenPeerConnection = new RTCPeerConnection({
             ...ICE_SERVERS,
             bundlePolicy: 'balanced',
             rtcpMuxPolicy: 'require'
         });
-        
+
         // Store in separate object
         screenShareConnections[userId] = screenPeerConnection;
 
@@ -990,7 +999,7 @@ async function setupScreenShareWithUser(userId) {
         screenPeerConnection.onconnectionstatechange = () => {
             const state = screenPeerConnection.connectionState;
             console.log(`🔄 Screen share connection state with ${userId}:`, state);
-            
+
             if (state === 'failed') {
                 console.log(`❌ Screen share connection failed with ${userId}`);
                 showToast('Screen share connection failed');
@@ -1001,7 +1010,7 @@ async function setupScreenShareWithUser(userId) {
         screenPeerConnection.oniceconnectionstatechange = () => {
             const state = screenPeerConnection.iceConnectionState;
             console.log(`🧊 Screen share ICE state with ${userId}:`, state);
-            
+
             if (state === 'failed') {
                 console.log(`❌ Screen share ICE failed with ${userId}, restarting`);
                 screenPeerConnection.restartIce();
@@ -1014,7 +1023,7 @@ async function setupScreenShareWithUser(userId) {
             offerToReceiveVideo: false,
             offerToReceiveAudio: false
         });
-        
+
         await screenPeerConnection.setLocalDescription(offer);
 
         // Send offer with screen share flag
@@ -1045,7 +1054,7 @@ function handleRoomChange() {
     const joinBtn = document.querySelector('.join-form .btn-primary');
     const createBtn = document.querySelector('.create-room-btn');
     const passwordSection = document.getElementById('passwordSection');
-    
+
     if (roomSelect.value === 'custom') {
         passwordInput.style.display = 'block';
         customRoomInput.style.display = 'block';
@@ -1067,8 +1076,8 @@ function handleRoomChange() {
 
 // Create private room
 async function createPrivateRoom() {
-    const username = document.getElementById('privateUsername').value.trim() || 
-                   document.getElementById('usernameInput').value.trim();
+    const username = document.getElementById('privateUsername').value.trim() ||
+        document.getElementById('usernameInput').value.trim();
     const password = document.getElementById('privatePassword').value.trim();
 
     if (!username) {
@@ -1107,7 +1116,7 @@ function copyRoomInfo() {
 function updateInputVolume(value) {
     inputVolumeLevel = value;
     document.getElementById('inputVolumeValue').textContent = value + '%';
-    
+
     // Apply gain to the audio context if available
     if (gainNode) {
         gainNode.gain.setValueAtTime(value / 100, audioContext.currentTime);
@@ -1120,13 +1129,13 @@ function updateInputVolume(value) {
 function updateOutputVolume(value) {
     outputVolumeLevel = value;
     document.getElementById('outputVolumeValue').textContent = value + '%';
-    
+
     // Apply to all audio elements
     const audioElements = document.querySelectorAll('audio, video');
     audioElements.forEach(element => {
         element.volume = value / 100;
     });
-    
+
     console.log(`🔊 Output volume set to ${value}%`);
 }
 
@@ -1139,10 +1148,10 @@ function toggleMobileView() {
     const sidebar = document.getElementById('sidebar');
     const mainContent = document.getElementById('mainContent');
     const mobileNavText = document.getElementById('mobileNavText');
-    
+
     if (window.innerWidth <= 767) {
         isMobileView = !isMobileView;
-        
+
         if (isMobileView) {
             sidebar.classList.add('hidden');
             mainContent.classList.add('mobile-active');
@@ -1164,7 +1173,7 @@ function showToast(message, duration = 3000) {
     const toast = document.getElementById('toast');
     toast.textContent = message;
     toast.classList.add('show');
-    
+
     setTimeout(() => {
         toast.classList.remove('show');
     }, duration);
@@ -1173,17 +1182,17 @@ function showToast(message, duration = 3000) {
 // Spam protection
 function checkSpamProtection() {
     const now = Date.now();
-    
+
     // Reset counter every minute
     if (now - lastMessageTime > 60000) {
         messageCount = 0;
     }
-    
+
     // Check if too many messages in short time
     if (now - lastMessageTime < 2000 && messageCount > 5) {
         return false; // Spam detected
     }
-    
+
     messageCount++;
     lastMessageTime = now;
     return true;
@@ -1203,7 +1212,7 @@ function escapeHtml(text) {
 function updateConnectionStatus(status) {
     const statusEl = document.getElementById('connectionStatus');
     statusEl.className = `connection-status status-${status}`;
-    
+
     switch (status) {
         case 'connected':
             statusEl.textContent = 'Connected';
@@ -1239,7 +1248,7 @@ async function initializeApp() {
             token: currentUser.token
         }
     });
-    
+
     // Connection event handlers
     socket.on('connect', () => {
         console.log('Connected to server:', socket.id);
@@ -1265,15 +1274,15 @@ async function initializeApp() {
         createdRoomInfo = data;
         const roomIdDisplay = document.getElementById('roomIdDisplay');
         const roomIdText = document.getElementById('roomIdText');
-        
+
         roomIdText.innerHTML = `<strong>Room ID:</strong> ${data.roomId}<br><strong>Password:</strong> ${data.password}`;
         roomIdDisplay.style.display = 'block';
-        
+
         // Auto-fill the form
         document.getElementById('customRoomInput').value = data.roomId;
         document.getElementById('passwordInput').value = data.password;
         document.getElementById('roomSelect').value = 'custom';
-        
+
         showToast('Private room created! Share the info with friends.');
     });
 
@@ -1285,13 +1294,13 @@ async function initializeApp() {
     socket.on('user-status-update', handleUserStatusUpdate);
     socket.on('user-screen-share-start', handleUserScreenShareStart);
     socket.on('user-screen-share-stop', handleUserScreenShareStop);
-    
+
     // WebRTC signaling handlers
     socket.on('webrtc-offer', handleWebRTCOffer);
     socket.on('webrtc-answer', handleWebRTCAnswer);
     socket.on('webrtc-ice-candidate', handleWebRTCIceCandidate);
     socket.on('user-disconnected', handleUserDisconnected);
-    
+
     // Error handling
     socket.on('error', (error) => {
         console.error('Socket error:', error);
@@ -1333,7 +1342,7 @@ async function joinRoom() {
             showToast('Please enter a custom room ID or create a new room');
             return;
         }
-        
+
         if (!password) {
             showToast('Please enter the room password');
             return;
@@ -1343,7 +1352,7 @@ async function joinRoom() {
 
     try {
         updateConnectionStatus('connecting');
-        
+
         // Get user media with selected microphone and enhanced settings
         const constraints = {
             audio: {
@@ -1351,8 +1360,8 @@ async function joinRoom() {
                 echoCancellation: true,
                 noiseSuppression: true,
                 autoGainControl: true
-            }, 
-            video: false 
+            },
+            video: false
         };
 
         localStream = await navigator.mediaDevices.getUserMedia(constraints);
@@ -1370,7 +1379,7 @@ async function joinRoom() {
             room: finalRoom,
             password: finalPassword
         });
-        
+
     } catch (error) {
         console.error('Error joining room:', error);
         showToast('Could not access microphone. Please check permissions.');
@@ -1386,9 +1395,9 @@ async function joinRoom() {
 function handleRoomJoined(data) {
     // Update room title with member count
     updateRoomTitle(data.room, data.users.length, data.isPasswordProtected);
-    
+
     updateUsersList(data.users);
-    
+
     // Clear chat and show message history
     clearChat();
     if (data.messages && data.messages.length > 0) {
@@ -1396,10 +1405,10 @@ function handleRoomJoined(data) {
             addChatMessage(msg.username, msg.message, msg.isSystem);
         });
     }
-    
+
     // Start group voice chat
     startGroupVoiceChat(data.users);
-    
+
     // Update UI
     document.getElementById('joinForm').style.display = 'none';
     document.getElementById('passwordSection').style.display = 'none';
@@ -1407,7 +1416,6 @@ function handleRoomJoined(data) {
     document.getElementById('welcomeScreen').style.display = 'none';
     document.getElementById('contentArea').style.display = 'flex';
     document.getElementById('voiceControls').style.display = 'block';
-    document.getElementById('volumeControls').style.display = 'block';
     document.getElementById('micBtn').disabled = false;
     document.getElementById('screenBtn').disabled = false;
     document.getElementById('leaveBtn').disabled = false;
@@ -1423,7 +1431,7 @@ function handleRoomJoined(data) {
     playNotificationSound('join');
     updateConnectionStatus('connected');
     showToast('Joined voice channel!');
-    
+
     // Initialize keyboard shortcuts
     initializeKeyboardShortcuts();
 }
@@ -1434,15 +1442,15 @@ function handleUserJoined(data) {
     addChatMessage('System', `${data.username} joined the room`, true);
     playNotificationSound('join');
     showToast(`${data.username} joined`);
-    
+
     // Update room title with new count
     const currentCount = getCurrentUserCount() + 1;
     const roomName = getCurrentRoomName();
     updateRoomTitle(roomName, currentCount, isCurrentRoomPasswordProtected());
-    
+
     // Add user to the list
     addUserToList(data);
-    
+
     // Connect to new user for voice chat
     if (isInVoiceChat) {
         connectToUser(data);
@@ -1454,32 +1462,32 @@ function handleUserJoined(data) {
 
 function handleUserLeft(data) {
     console.log('User left:', data);
-    
+
     // Clean up voice connection
     if (peerConnections[data.userId]) {
         cleanupPeerConnection(peerConnections[data.userId], data.userId, false);
     }
-    
+
     // Clean up screen share connections
     if (screenPeerConnections[data.userId]) {
         cleanupPeerConnection(screenPeerConnections[data.userId], data.userId, true);
     }
-    
+
     if (screenShareConnections[data.userId]) {
         cleanupPeerConnection(screenShareConnections[data.userId], data.userId, true);
     }
-    
+
     // Remove user from list
     const userElement = document.getElementById(`user-${data.userId}`);
     if (userElement) {
         userElement.remove();
     }
-    
+
     // Update room title with new count
     const currentCount = Math.max(1, getCurrentUserCount() - 1);
     const roomName = getCurrentRoomName();
     updateRoomTitle(roomName, currentCount, isCurrentRoomPasswordProtected());
-    
+
     addChatMessage('System', `${data.username} left the room`, true);
     playNotificationSound('leave');
     showToast(`${data.username} left`);
@@ -1511,12 +1519,12 @@ function handleUserScreenShareStop(data) {
 // WebRTC Voice Chat Functions
 async function startGroupVoiceChat(users) {
     if (!localStream) return;
-    
+
     isInVoiceChat = true;
-    
+
     // Add yourself to the voice chat
     addVoiceElement('local', 'You', null, true);
-    
+
     // Connect to all other users in the room
     for (const user of users) {
         if (user.id !== currentUser.id) {
@@ -1527,22 +1535,22 @@ async function startGroupVoiceChat(users) {
 
 async function connectToUser(user) {
     if (peerConnections[user.id]) return; // Already connected
-    
+
     try {
         console.log(`Connecting to ${user.username}...`);
-        
+
         const peerConnection = new RTCPeerConnection({
             ...ICE_SERVERS,
             bundlePolicy: 'balanced',
             rtcpMuxPolicy: 'require'
         });
         peerConnections[user.id] = peerConnection;
-        
+
         // Add local stream to peer connection
         localStream.getTracks().forEach(track => {
             peerConnection.addTrack(track, localStream);
         });
-        
+
         // Handle incoming stream
         peerConnection.ontrack = (event) => {
             const [remoteStream] = event.streams;
@@ -1550,7 +1558,7 @@ async function connectToUser(user) {
             connectedUsers.add(user.id);
             console.log(`Now hearing ${user.username}`);
         };
-        
+
         // Handle ICE candidates
         peerConnection.onicecandidate = (event) => {
             if (event.candidate) {
@@ -1562,12 +1570,12 @@ async function connectToUser(user) {
                 });
             }
         };
-        
+
         // Enhanced connection state monitoring
         peerConnection.onconnectionstatechange = () => {
             const state = peerConnection.connectionState;
             console.log(`🔄 Voice connection state with ${user.username}:`, state);
-            
+
             if (state === 'failed' || state === 'closed') {
                 console.log(`💔 Voice connection ${state} with ${user.username}, cleaning up`);
                 cleanupPeerConnection(peerConnection, user.id, false);
@@ -1577,24 +1585,24 @@ async function connectToUser(user) {
         peerConnection.oniceconnectionstatechange = () => {
             const state = peerConnection.iceConnectionState;
             console.log(`🧊 Voice ICE connection state with ${user.username}:`, state);
-            
+
             if (state === 'failed') {
                 console.log(`❌ Voice ICE connection failed with ${user.username}, attempting restart`);
                 peerConnection.restartIce();
             }
         };
-        
+
         // Create and send offer
         const offer = await peerConnection.createOffer();
         await peerConnection.setLocalDescription(offer);
-        
+
         socket.emit('webrtc-offer', {
             targetUserId: user.id,
             offer: offer,
             callerId: currentUser.id,
             isScreenShare: false
         });
-        
+
     } catch (error) {
         console.error(`Error connecting to ${user.username}:`, error);
     }
@@ -1602,15 +1610,15 @@ async function connectToUser(user) {
 
 function handleUserDisconnected(data) {
     const { userId } = data;
-    
+
     if (peerConnections[userId]) {
         cleanupPeerConnection(peerConnections[userId], userId, false);
     }
-    
+
     if (screenPeerConnections[userId]) {
         cleanupPeerConnection(screenPeerConnections[userId], userId, true);
     }
-    
+
     if (screenShareConnections[userId]) {
         cleanupPeerConnection(screenShareConnections[userId], userId, true);
     }
@@ -1628,7 +1636,7 @@ function findUserById(userId) {
 // ENHANCED cleanup function
 function cleanupVoiceChat() {
     console.log('🧹 Cleaning up all connections...');
-    
+
     // Close all peer connections
     Object.keys(peerConnections).forEach(userId => {
         console.log(`🔌 Closing voice connection with ${userId}`);
@@ -1638,7 +1646,7 @@ function cleanupVoiceChat() {
             console.warn('Error closing voice connection:', error);
         }
     });
-    
+
     Object.keys(screenPeerConnections).forEach(userId => {
         console.log(`🔌 Closing screen peer connection with ${userId}`);
         try {
@@ -1647,7 +1655,7 @@ function cleanupVoiceChat() {
             console.warn('Error closing screen peer connection:', error);
         }
     });
-    
+
     Object.keys(screenShareConnections).forEach(userId => {
         console.log(`🔌 Closing screen share connection with ${userId}`);
         try {
@@ -1656,13 +1664,13 @@ function cleanupVoiceChat() {
             console.warn('Error closing screen share connection:', error);
         }
     });
-    
+
     peerConnections = {};
     screenPeerConnections = {};
     screenShareConnections = {};
     connectedUsers.clear();
     isInVoiceChat = false;
-    
+
     console.log('✅ Connection cleanup complete');
 }
 
@@ -1678,7 +1686,7 @@ function toggleMic() {
     if (audioTrack) {
         isMuted = !isMuted;
         audioTrack.enabled = !isMuted;
-        
+
         const micBtn = document.getElementById('micBtn');
         if (isMuted) {
             micBtn.textContent = '🔇 Muted';
@@ -1705,34 +1713,34 @@ function toggleMic() {
 // FIXED Screen Share Toggle
 async function toggleScreenShare() {
     console.log('🎬 Screen share toggle clicked, current state:', isScreenSharing);
-    
+
     try {
         if (!isScreenSharing) {
             console.log('🚀 Starting screen share...');
-            
+
             // Get screen stream
-            screenStream = await navigator.mediaDevices.getDisplayMedia({ 
+            screenStream = await navigator.mediaDevices.getDisplayMedia({
                 video: {
                     width: { ideal: 1280, max: 1920 },
                     height: { ideal: 720, max: 1080 },
                     frameRate: { ideal: 15, max: 30 }
-                }, 
+                },
                 audio: true
             });
-            
+
             console.log('✅ Screen stream obtained');
             console.log('Video tracks:', screenStream.getVideoTracks().length);
             console.log('Audio tracks:', screenStream.getAudioTracks().length);
-            
+
             // Add to local display
             addScreenShareElement('screen-local', 'Your Screen Share', screenStream);
-            
+
             // Update UI
             const screenBtn = document.getElementById('screenBtn');
             screenBtn.textContent = '⏹️ Stop Share';
             screenBtn.className = 'btn btn-danger';
             isScreenSharing = true;
-            
+
             showToast('Screen sharing started');
             playNotificationSound('screen_start');
 
@@ -1747,7 +1755,7 @@ async function toggleScreenShare() {
             // Connect to ALL users in the room for screen sharing
             console.log('🔗 Connecting screen share to all users...');
             console.log('Voice connections:', Object.keys(peerConnections));
-            
+
             // Wait a bit for server notification to propagate
             setTimeout(async () => {
                 for (const userId in peerConnections) {
@@ -1774,7 +1782,7 @@ async function toggleScreenShare() {
     } catch (error) {
         console.error('❌ Screen share error:', error);
         showToast('Screen sharing failed: ' + error.message);
-        
+
         // Reset UI on error
         const screenBtn = document.getElementById('screenBtn');
         screenBtn.textContent = '📺 Screen';
@@ -1786,7 +1794,7 @@ async function toggleScreenShare() {
 // Enhanced Stop Screen Share
 function stopScreenShare() {
     console.log('🛑 Stopping screen share');
-    
+
     if (screenStream) {
         screenStream.getTracks().forEach(track => {
             console.log(`⏹️ Stopping ${track.kind} track`);
@@ -1794,29 +1802,31 @@ function stopScreenShare() {
         });
         screenStream = null;
     }
-    
+
     // Close all screen share connections
     Object.keys(screenShareConnections).forEach(userId => {
         console.log(`🔌 Closing screen share connection with ${userId}`);
         cleanupPeerConnection(screenShareConnections[userId], userId, true);
     });
-    
+
     Object.keys(screenPeerConnections).forEach(userId => {
         console.log(`🔌 Closing screen peer connection with ${userId}`);
         cleanupPeerConnection(screenPeerConnections[userId], userId, true);
     });
-    
+
     // Remove UI elements - FIXED: Only remove your own screen share
     removeScreenShareElement('screen-local');
-    
+
     // Reset button
     const screenBtn = document.getElementById('screenBtn');
     screenBtn.textContent = '📺 Screen';
     screenBtn.className = 'btn btn-primary';
-    isScreenSharing = false;
-    
-    showToast('Screen sharing stopped');
-    playNotificationSound('screen_stop');
+
+    if (isScreenSharing) {
+        showToast('Screen sharing stopped');
+        playNotificationSound('screen_stop');
+        isScreenSharing = false;
+    }
 
     // Notify server
     if (socket && currentUser) {
@@ -1848,7 +1858,7 @@ function leaveRoom() {
         });
         localStream = null;
     }
-    
+
     stopScreenShare();
 
     // EXTRA: Reset mute state
@@ -1875,26 +1885,11 @@ function leaveRoom() {
 
     // Clean up voice chat
     cleanupVoiceChat();
-    
+
     // Remove keyboard shortcuts
     document.removeEventListener('keydown', handleKeyDown);
 
-    // ENHANCED UI RESET
-    document.getElementById('joinForm').style.display = 'block';
-    document.getElementById('welcomeScreen').style.display = 'block';
-    document.getElementById('contentArea').style.display = 'none';
-    document.getElementById('voiceControls').style.display = 'none';
-    document.getElementById('volumeControls').style.display = 'none';
-    document.getElementById('micBtn').disabled = true;
-    document.getElementById('screenBtn').disabled = true;
-    document.getElementById('leaveBtn').disabled = true;
-    document.getElementById('roomTitle').textContent = 'Welcome to MemoChat';
-    document.getElementById('roomSubtitle').textContent = 'Enter your name to get started';
-    document.title = 'MemoChat - Voice & Screen Share'; // Reset page title
 
-    // Hide mobile nav
-    document.getElementById('mobileNav').style.display = 'none';
-    
     // Reset mobile view
     if (window.innerWidth <= 767) {
         document.getElementById('sidebar').classList.remove('hidden');
@@ -1907,7 +1902,30 @@ function leaveRoom() {
     clearChat();
     updateConnectionStatus('connected');
 
+    // FIX: Show join form again and hide voice controls
+    const joinForm = document.getElementById('joinForm');
+    const voiceControls = document.getElementById('voiceControls');
+    const contentArea = document.getElementById('contentArea');
+    const welcomeScreen = document.getElementById('welcomeScreen');
+
+    if (joinForm) joinForm.style.display = 'block';
+    if (voiceControls) voiceControls.style.display = 'none';
+    if (contentArea) contentArea.style.display = 'none';
+    if (welcomeScreen) welcomeScreen.style.display = 'block';
+
+    // Reset control buttons
+    const leaveBtn = document.getElementById('leaveBtn');
+    const screenBtn = document.getElementById('screenBtn');
+    if (micBtn) micBtn.disabled = true;
+    if (screenBtn) screenBtn.disabled = true;
+    if (leaveBtn) leaveBtn.disabled = true;
+
+    // Reset room selection
+    const roomSelect = document.getElementById('roomSelect');
+    if (roomSelect) roomSelect.value = '';
+
     currentRoom = null;
+    isInVoiceChat = false;
 }
 
 // ===============================
@@ -1918,7 +1936,7 @@ function leaveRoom() {
 function playNotificationSound(type) {
     try {
         const tempAudioContext = new (window.AudioContext || window.webkitAudioContext)();
-        
+
         const frequencies = {
             'join': [440, 554, 659],
             'leave': [659, 554, 440],
@@ -1932,22 +1950,22 @@ function playNotificationSound(type) {
         };
 
         const freqs = frequencies[type] || [440];
-        
+
         freqs.forEach((freq, index) => {
             setTimeout(() => {
                 const oscillator = tempAudioContext.createOscillator();
                 const gainNode = tempAudioContext.createGain();
-                
+
                 oscillator.connect(gainNode);
                 gainNode.connect(tempAudioContext.destination);
-                
+
                 oscillator.frequency.setValueAtTime(freq, tempAudioContext.currentTime);
                 oscillator.type = 'sine';
-                
+
                 gainNode.gain.setValueAtTime(0, tempAudioContext.currentTime);
                 gainNode.gain.linearRampToValueAtTime(0.1, tempAudioContext.currentTime + 0.01);
                 gainNode.gain.exponentialRampToValueAtTime(0.01, tempAudioContext.currentTime + 0.2);
-                
+
                 oscillator.start(tempAudioContext.currentTime);
                 oscillator.stop(tempAudioContext.currentTime + 0.2);
             }, index * 100);
@@ -1964,7 +1982,7 @@ function playNotificationSound(type) {
 // Element Management Functions
 function addVoiceElement(userId, userName, stream, isLocal = false) {
     const videoGrid = document.getElementById('videoGrid');
-    
+
     // Clear welcome message if this is the first user
     const welcomeMsg = videoGrid.querySelector('[style*="display: flex"]');
     if (welcomeMsg && welcomeMsg.style.display !== 'none') {
@@ -2021,7 +2039,7 @@ function removeVoiceElement(userId) {
     if (voiceElement) {
         voiceElement.remove();
     }
-    
+
     const audioElement = document.getElementById(`audio-${userId}`);
     if (audioElement) {
         audioElement.remove();
@@ -2030,7 +2048,7 @@ function removeVoiceElement(userId) {
 
 function addScreenShareElement(id, label, stream) {
     console.log('🖼️ Adding screen share element:', id, label);
-    
+
     const videoGrid = document.getElementById('videoGrid');
 
     // Remove existing screen share if any
@@ -2053,13 +2071,13 @@ function addScreenShareElement(id, label, stream) {
     video.style.height = '100%';
     video.style.objectFit = 'contain'; // Show entire screen, don't crop
     video.style.backgroundColor = '#000'; // Black background instead of grey
-    
+
     // Apply volume setting
     video.volume = outputVolumeLevel / 100;
-    
+
     if (stream) {
         video.srcObject = stream;
-        
+
         // Enhanced debug logging
         video.onloadedmetadata = () => {
             console.log('📺 Screen share video metadata loaded:', {
@@ -2068,7 +2086,7 @@ function addScreenShareElement(id, label, stream) {
                 duration: video.duration,
                 readyState: video.readyState
             });
-            
+
             // Force play after metadata is loaded
             video.play().then(() => {
                 console.log('▶️ Screen share video playing successfully');
@@ -2076,15 +2094,15 @@ function addScreenShareElement(id, label, stream) {
                 console.error('❌ Error playing screen share video:', err);
             });
         };
-        
+
         video.onplay = () => {
             console.log('▶️ Screen share video started playing');
         };
-        
+
         video.onerror = (error) => {
             console.error('❌ Screen share video error:', error);
         };
-        
+
         // Check if stream has active tracks
         const videoTracks = stream.getVideoTracks();
         if (videoTracks.length > 0) {
@@ -2158,7 +2176,7 @@ function sendMessage() {
 function handleChatMessage(data) {
     const { username, message, isSystem } = data;
     addChatMessage(username, message, isSystem);
-    
+
     // Play sound only for messages from others
     if (currentUser && data.userId !== currentUser.id) {
         playNotificationSound('message_received');
@@ -2168,7 +2186,7 @@ function handleChatMessage(data) {
 function addChatMessage(author, content, isSystem = false, isError = false) {
     const chatMessages = document.getElementById('chatMessages');
     const messageDiv = document.createElement('div');
-    
+
     if (isError) {
         messageDiv.className = 'message error-message';
     } else {
@@ -2215,12 +2233,12 @@ function clearChat() {
 // ENHANCED User Management Functions
 function addUserToList(userData) {
     const usersList = document.getElementById('usersList');
-    
+
     const userItem = document.createElement('div');
     userItem.className = 'user-item';
     userItem.dataset.userId = userData.userId;
     userItem.id = `user-${userData.userId}`;
-    
+
     userItem.innerHTML = `
         <div class="user-avatar">${userData.username[0].toUpperCase()}</div>
         <div class="user-info">
@@ -2229,7 +2247,7 @@ function addUserToList(userData) {
         </div>
         <div class="status-indicator status-online"></div>
     `;
-    
+
     usersList.appendChild(userItem);
 }
 
@@ -2242,7 +2260,7 @@ function updateUsersList(users) {
         userItem.className = 'user-item';
         userItem.dataset.userId = user.id;
         userItem.id = `user-${user.id}`;
-        
+
         userItem.innerHTML = `
             <div class="user-avatar">${user.username[0].toUpperCase()}</div>
             <div class="user-info">
@@ -2266,10 +2284,10 @@ function clearUsersList() {
 function updateUserStatus(userId, status) {
     const userElement = document.getElementById(`user-${userId}`);
     if (!userElement) return;
-    
+
     const statusIndicator = userElement.querySelector('.status-indicator');
     const userStatus = userElement.querySelector('.user-status');
-    
+
     if (status.isMuted) {
         statusIndicator.className = 'status-indicator status-muted';
         userStatus.textContent = 'Muted';
@@ -2345,20 +2363,20 @@ async function loadMicrophones() {
     try {
         const devices = await navigator.mediaDevices.enumerateDevices();
         availableMicrophones = devices.filter(device => device.kind === 'audioinput');
-        
+
         const select = document.getElementById('microphoneSelect');
         select.innerHTML = '<option value="">Default Microphone</option>';
-        
+
         availableMicrophones.forEach(mic => {
             const option = document.createElement('option');
             option.value = mic.deviceId;
             option.textContent = mic.label || `Microphone ${availableMicrophones.indexOf(mic) + 1}`;
             select.appendChild(option);
         });
-        
+
         // Set current selection
         select.value = currentSettings.microphoneId || '';
-        
+
     } catch (error) {
         console.error('Error loading microphones:', error);
         showToast('❌ Could not load microphone list');
@@ -2375,16 +2393,16 @@ async function refreshDevices() {
 function updateSettingsUI() {
     document.getElementById('sensitivitySlider').value = currentSettings.gateThreshold;
     document.getElementById('sensitivityValue').textContent = currentSettings.gateThreshold;
-    
+
     document.getElementById('releaseTimeSlider').value = currentSettings.releaseTime;
     document.getElementById('releaseTimeValue').textContent = currentSettings.releaseTime + 'ms';
-    
+
     // Add event listeners for real-time updates
-    document.getElementById('sensitivitySlider').oninput = function() {
+    document.getElementById('sensitivitySlider').oninput = function () {
         document.getElementById('sensitivityValue').textContent = this.value;
     };
-    
-    document.getElementById('releaseTimeSlider').oninput = function() {
+
+    document.getElementById('releaseTimeSlider').oninput = function () {
         document.getElementById('releaseTimeValue').textContent = this.value + 'ms';
     };
 }
@@ -2393,7 +2411,7 @@ function updateSettingsUI() {
 async function testMicrophone() {
     const testBtn = document.getElementById('testMicBtn');
     const levelBar = document.getElementById('audioLevelBar');
-    
+
     if (testStream) {
         // Stop testing
         testStream.getTracks().forEach(track => track.stop());
@@ -2404,7 +2422,7 @@ async function testMicrophone() {
         levelBar.style.width = '0%';
         return;
     }
-    
+
     try {
         const micId = document.getElementById('microphoneSelect').value;
         const constraints = {
@@ -2415,29 +2433,29 @@ async function testMicrophone() {
                 autoGainControl: true
             }
         };
-        
+
         testStream = await navigator.mediaDevices.getUserMedia(constraints);
         testBtn.textContent = '⏹️ Stop Test';
         testBtn.className = 'btn btn-danger';
-        
+
         // Create audio level monitoring
         const audioContext = new AudioContext();
         const source = audioContext.createMediaStreamSource(testStream);
         const analyser = audioContext.createAnalyser();
         analyser.fftSize = 256;
         source.connect(analyser);
-        
+
         const dataArray = new Uint8Array(analyser.frequencyBinCount);
-        
+
         audioLevelInterval = setInterval(() => {
             analyser.getByteFrequencyData(dataArray);
             const average = dataArray.reduce((a, b) => a + b) / dataArray.length;
             const percentage = Math.min(100, (average / 128) * 100);
             levelBar.style.width = percentage + '%';
         }, 100);
-        
+
         showToast('🎤 Testing microphone - speak to see levels');
-        
+
     } catch (error) {
         console.error('Error testing microphone:', error);
         showToast('❌ Could not access microphone');
@@ -2449,9 +2467,9 @@ function saveSettings() {
     currentSettings.microphoneId = document.getElementById('microphoneSelect').value || null;
     currentSettings.gateThreshold = parseFloat(document.getElementById('sensitivitySlider').value);
     currentSettings.releaseTime = parseInt(document.getElementById('releaseTimeSlider').value);
-    
+
     saveSettingsToStorage();
-    
+
     // If in a room, restart audio with new settings
     if (currentRoom && localStream) {
         showToast('🔄 Applying new audio settings...');
@@ -2459,7 +2477,7 @@ function saveSettings() {
             initializeAudioContext();
         }, 500);
     }
-    
+
     closeSettings();
     showToast('💾 Settings saved successfully!');
 }
@@ -2491,7 +2509,7 @@ function debugConnections() {
     console.log('Current user:', currentUser);
     console.log('Audio context:', audioContext);
     console.log('Gain node:', gainNode);
-    
+
     // Check connection states
     Object.entries(peerConnections).forEach(([userId, pc]) => {
         console.log(`Voice connection ${userId}:`, {
@@ -2500,7 +2518,7 @@ function debugConnections() {
             signalingState: pc.signalingState
         });
     });
-    
+
     Object.entries(screenShareConnections).forEach(([userId, pc]) => {
         console.log(`Screen connection ${userId}:`, {
             connectionState: pc.connectionState,
@@ -2508,7 +2526,7 @@ function debugConnections() {
             signalingState: pc.signalingState
         });
     });
-    
+
     if (screenStream) {
         console.log('Screen stream tracks:');
         screenStream.getTracks().forEach((track, index) => {
@@ -2530,7 +2548,7 @@ function startConnectionHealthMonitoring() {
             ...Object.values(screenShareConnections),
             ...Object.values(screenPeerConnections)
         ];
-        
+
         allConnections.forEach((pc, index) => {
             if (pc.connectionState === 'failed') {
                 console.warn(`🚨 Connection ${index} is in failed state, attempting restart`);
@@ -2553,7 +2571,7 @@ document.addEventListener('DOMContentLoaded', () => {
     loadSettings(); // ← ADD THIS LINE
     checkAuthStatus();
     startConnectionHealthMonitoring();
-    
+
     // Generate initial captcha
     if (document.getElementById('captchaQuestion')) {
         generateCaptcha();
@@ -2561,7 +2579,7 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // Handle enter key in inputs
-document.addEventListener('keypress', function(e) {
+document.addEventListener('keypress', function (e) {
     if (e.target.id === 'loginUsername' && e.key === 'Enter') {
         handleLogin();
     }
@@ -2597,7 +2615,7 @@ document.addEventListener('keypress', function(e) {
 });
 
 // Handle window resize for mobile responsiveness
-window.addEventListener('resize', function() {
+window.addEventListener('resize', function () {
     if (window.innerWidth > 767) {
         document.getElementById('sidebar').classList.remove('hidden');
         document.getElementById('mainContent').classList.remove('mobile-active');
