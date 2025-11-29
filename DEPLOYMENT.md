@@ -1,6 +1,6 @@
 # 🚀 MemoChat Deployment Guide
 
-Since Railway's free tier has ended, here are the best **free alternatives** to deploy your MemoChat backend:
+Here are the best **free alternatives** to deploy your MemoChat backend:
 
 ---
 
