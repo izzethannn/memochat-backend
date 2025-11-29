@@ -810,6 +810,227 @@ io.on('connection', (socket) => {
         });
     });
 
+    // ========== FRIEND SYSTEM EVENTS ==========
+
+    // Look up user by invitation code
+    socket.on('lookup-user-by-code', async (data) => {
+        try {
+            const { invitationCode } = data;
+            const result = await db.friendSystem.findUserByCode(invitationCode);
+
+            if (result.rows.length > 0) {
+                const user = result.rows[0];
+                socket.emit('user-found', {
+                    id: user.id,
+                    username: user.username,
+                    displayName: user.display_name,
+                    status: user.status
+                });
+            } else {
+                socket.emit('user-not-found', { message: 'Invalid invitation code' });
+            }
+        } catch (err) {
+            console.error('Error looking up user:', err);
+            socket.emit('error', { message: 'Failed to lookup user' });
+        }
+    });
+
+    // Send friend request
+    socket.on('send-friend-request', async (data) => {
+        try {
+            const { receiverId } = data;
+            const result = await db.friendSystem.sendFriendRequest(socket.userId, receiverId);
+
+            if (result.rows.length > 0) {
+                const request = result.rows[0];
+
+                // Notify receiver if online
+                const receiverSocket = getSocketByUserId(receiverId);
+                if (receiverSocket) {
+                    receiverSocket.emit('friend-request-received', {
+                        requestId: request.id,
+                        senderId: socket.userId,
+                        senderUsername: socket.username,
+                        createdAt: request.created_at
+                    });
+                }
+
+                socket.emit('friend-request-sent', {
+                    receiverId: receiverId
+                });
+            } else {
+                socket.emit('error', { message: 'Friend request already sent' });
+            }
+        } catch (err) {
+            console.error('Error sending friend request:', err);
+            socket.emit('error', { message: 'Failed to send friend request' });
+        }
+    });
+
+    // Accept friend request
+    socket.on('accept-friend-request', async (data) => {
+        try {
+            const { requestId } = data;
+            const request = await db.friendSystem.acceptFriendRequest(socket.userId, requestId);
+
+            // Notify sender if online
+            const senderSocket = getSocketByUserId(request.sender_id);
+            if (senderSocket) {
+                senderSocket.emit('friend-request-accepted', {
+                    userId: socket.userId,
+                    username: socket.username
+                });
+            }
+
+            socket.emit('friend-added', {
+                userId: request.sender_id
+            });
+
+            // Refresh friends lists for both users
+            socket.emit('refresh-friends');
+            if (senderSocket) {
+                senderSocket.emit('refresh-friends');
+            }
+        } catch (err) {
+            console.error('Error accepting friend request:', err);
+            socket.emit('error', { message: err.message });
+        }
+    });
+
+    // Decline friend request
+    socket.on('decline-friend-request', async (data) => {
+        try {
+            const { requestId } = data;
+            await db.friendSystem.declineFriendRequest(socket.userId, requestId);
+            socket.emit('friend-request-declined', { requestId });
+        } catch (err) {
+            console.error('Error declining friend request:', err);
+            socket.emit('error', { message: 'Failed to decline friend request' });
+        }
+    });
+
+    // Get friends list
+    socket.on('get-friends', async () => {
+        try {
+            const result = await db.friendSystem.getFriends(socket.userId);
+            socket.emit('friends-list', result.rows);
+        } catch (err) {
+            console.error('Error getting friends:', err);
+            socket.emit('error', { message: 'Failed to get friends list' });
+        }
+    });
+
+    // Get pending friend requests
+    socket.on('get-pending-requests', async () => {
+        try {
+            const result = await db.friendSystem.getPendingRequests(socket.userId);
+            socket.emit('pending-requests', result.rows);
+        } catch (err) {
+            console.error('Error getting pending requests:', err);
+            socket.emit('error', { message: 'Failed to get pending requests' });
+        }
+    });
+
+    // Get my invitation code
+    socket.on('get-my-code', async () => {
+        try {
+            const result = await db.friendSystem.getMyInvitationCode(socket.userId);
+            if (result.rows.length > 0) {
+                socket.emit('my-invitation-code', {
+                    code: result.rows[0].my_invitation_code
+                });
+            }
+        } catch (err) {
+            console.error('Error getting invitation code:', err);
+            socket.emit('error', { message: 'Failed to get invitation code' });
+        }
+    });
+
+    // Send direct message
+    socket.on('send-dm', async (data) => {
+        try {
+            const { receiverId, message } = data;
+
+            // Check if users are friends
+            const areFriends = await db.friendSystem.areFriends(socket.userId, receiverId);
+            if (!areFriends) {
+                socket.emit('error', { message: 'You can only message friends' });
+                return;
+            }
+
+            const sanitizedMessage = sanitizeInput(message);
+            const result = await db.friendSystem.saveDirectMessage(
+                socket.userId,
+                receiverId,
+                sanitizedMessage
+            );
+
+            const dm = result.rows[0];
+
+            // Send to receiver if online
+            const receiverSocket = getSocketByUserId(receiverId);
+            if (receiverSocket) {
+                receiverSocket.emit('dm-received', {
+                    id: dm.id,
+                    senderId: socket.userId,
+                    senderUsername: socket.username,
+                    message: dm.message,
+                    createdAt: dm.created_at
+                });
+            }
+
+            // Confirm to sender
+            socket.emit('dm-sent', {
+                id: dm.id,
+                receiverId: receiverId,
+                message: dm.message,
+                createdAt: dm.created_at
+            });
+        } catch (err) {
+            console.error('Error sending DM:', err);
+            socket.emit('error', { message: 'Failed to send message' });
+        }
+    });
+
+    // Get DM history
+    socket.on('get-dm-history', async (data) => {
+        try {
+            const { friendId, limit } = data;
+            const messages = await db.friendSystem.getDirectMessages(
+                socket.userId,
+                friendId,
+                limit || 50
+            );
+            socket.emit('dm-history', messages);
+        } catch (err) {
+            console.error('Error getting DM history:', err);
+            socket.emit('error', { message: 'Failed to get message history' });
+        }
+    });
+
+    // Mark DMs as read
+    socket.on('mark-dm-read', async (data) => {
+        try {
+            const { senderId } = data;
+            await db.friendSystem.markMessagesAsRead(socket.userId, senderId);
+            socket.emit('dm-marked-read', { senderId });
+        } catch (err) {
+            console.error('Error marking DMs as read:', err);
+            socket.emit('error', { message: 'Failed to mark messages as read' });
+        }
+    });
+
+    // Get unread count
+    socket.on('get-unread-count', async () => {
+        try {
+            const result = await db.friendSystem.getUnreadCount(socket.userId);
+            socket.emit('unread-counts', result.rows);
+        } catch (err) {
+            console.error('Error getting unread count:', err);
+            socket.emit('error', { message: 'Failed to get unread count' });
+        }
+    });
+
     // Handle disconnection
     socket.on('disconnect', () => {
         console.log(`User disconnected: ${socket.id} (${socket.username})`);
@@ -820,6 +1041,16 @@ io.on('connection', (socket) => {
         connectedUsers.delete(socket.id);
     });
 });
+
+// Helper function to get socket by user ID
+function getSocketByUserId(userId) {
+    for (let [socketId, user] of connectedUsers.entries()) {
+        if (user.id === userId) {
+            return io.sockets.sockets.get(socketId);
+        }
+    }
+    return null;
+}
 
 // Enhanced helper function to handle user leaving
 function handleUserLeave(socket, userId = null) {

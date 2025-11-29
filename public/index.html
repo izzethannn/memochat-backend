@@ -13,6 +13,7 @@
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="friend-system.css">
 </head>
 
 <body>
@@ -129,7 +130,6 @@
         <div class="sidebar" id="sidebar">
             <div class="room-info">
                 <h2>📝 MemoChat</h2>
-                <p>Memorable voice chat with enhanced features</p>
             </div>
 
             <div class="join-form" id="joinForm">
@@ -173,9 +173,33 @@
                 <p style="font-size: 11px; opacity: 0.7; margin-top: 5px;">Everyone can hear each other</p>
             </div>
 
-            <div class="users-list" id="usersList">
-                <div style="text-align: center; opacity: 0.6; margin-top: 30px;">
-                    Join a room to see other users
+            <div class="users-list" id="usersList"></div>
+
+            <!-- Friends Section -->
+            <div class="friends-section" id="friendsSection" style="display: none;">
+                <!-- My Invitation Code -->
+                <div class="my-code-section">
+                    <label>📨 My Invitation Code:</label>
+                    <div class="code-display">
+                        <span id="myInvitationCode">Loading...</span>
+                        <button class="btn btn-sm btn-primary" onclick="copyMyCode()">📋</button>
+                    </div>
+                </div>
+
+                <!-- Add Friend -->
+                <div class="add-friend-section">
+                    <h4>➕ Add Friend</h4>
+                    <input type="text" id="friendCodeInput" placeholder="Enter friend's code" maxlength="10" />
+                    <button class="btn btn-primary btn-sm" onclick="lookupFriend()">Find Friend</button>
+                    <div id="friendLookupResult"></div>
+                </div>
+
+                <!-- Pending Requests -->
+                <div class="pending-requests" id="pendingRequests"></div>
+
+                <!-- Friends List -->
+                <div class="friends-list" id="friendsList">
+                    <p style="text-align: center; opacity: 0.6; margin-top: 20px;">No friends yet</p>
                 </div>
             </div>
 
@@ -245,9 +269,6 @@
                     <div style="text-align: center;">
                         <h3 style="font-size: 18px; margin-bottom: 10px;">🎙️ Group Voice Chat Ready</h3>
                         <p style="font-size: 14px;">Join a room to start talking with friends</p>
-                        <p style="margin-top: 15px; font-size: 13px; opacity: 0.8;">
-                            ✨ Features: Volume controls, Password protection, Screen sharing
-                        </p>
                     </div>
                 </div>
             </div>
@@ -266,6 +287,21 @@
 
     <div class="connection-status status-disconnected" id="connectionStatus">
         Disconnected
+    </div>
+
+    <!-- Direct Message Modal -->
+    <div class="dm-modal" id="dmModal" style="display: none;">
+        <div class="dm-content">
+            <div class="dm-header">
+                <h3 id="dmUsername"></h3>
+                <button class="btn btn-danger btn-sm" onclick="closeDM()">✕</button>
+            </div>
+            <div class="dm-messages" id="dmMessages"></div>
+            <div class="dm-input-area">
+                <input type="text" id="dmInput" placeholder="Type a message..." maxlength="500" />
+                <button class="btn btn-primary" onclick="sendDM()">Send</button>
+            </div>
+        </div>
     </div>
 
     <script src="app.js"></script>

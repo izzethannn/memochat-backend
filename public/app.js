@@ -1254,6 +1254,12 @@ async function initializeApp() {
         console.log('Connected to server:', socket.id);
         updateConnectionStatus('connected');
         showToast('Connected to server');
+        // Setup friend system handlers
+        setupFriendSystemHandlers();
+        // Initialize friend system after socket connects
+        if (isLoggedIn) {
+            initFriendSystem();
+        }
     });
 
     socket.on('disconnect', () => {
@@ -2274,11 +2280,7 @@ function updateUsersList(users) {
 }
 
 function clearUsersList() {
-    document.getElementById('usersList').innerHTML = `
-        <div style="text-align: center; opacity: 0.6; margin-top: 30px;">
-            Join a room to see other users
-        </div>
-    `;
+    document.getElementById('usersList').innerHTML = '';
 }
 
 function updateUserStatus(userId, status) {
@@ -2644,3 +2646,284 @@ setInterval(applyVolumeSettings, 1000);
 
 // Make debug function available globally for troubleshooting
 window.debugConnections = debugConnections;
+// ========== FRIEND SYSTEM JAVASCRIPT ==========
+
+// Friend System Variables
+let currentDMFriend = null;
+let friendsList = [];
+let unreadCounts = {};
+let myInvitationCode = '';
+
+// Initialize friend system after login
+function initFriendSystem() {
+    console.log('🔵 initFriendSystem() called');
+    console.log('Socket exists:', !!socket);
+    console.log('Socket connected:', socket?.connected);
+    console.log('Current user:', currentUser);
+
+    socket.emit('get-my-code');
+    socket.emit('get-friends');
+    socket.emit('get-pending-requests');
+    socket.emit('get-unread-count');
+    document.getElementById('friendsSection').style.display = 'block';
+}
+
+// Setup all friend system socket event handlers
+// IMPORTANT: This must be called AFTER socket is created in initializeApp()
+function setupFriendSystemHandlers() {
+    // Get my invitation code
+    socket.on('my-invitation-code', (data) => {
+        myInvitationCode = data.code;
+        document.getElementById('myInvitationCode').textContent = data.code;
+    });
+
+    // User found
+    socket.on('user-found', (user) => {
+        const resultDiv = document.getElementById('friendLookupResult');
+        resultDiv.innerHTML = `
+            <div class="friend-lookup-result">
+                <span>👤 ${user.username}</span>
+                <button class="btn btn-sm btn-success" onclick="sendFriendRequest(${user.id})">Add Friend</button>
+            </div>
+        `;
+    });
+
+    // User not found
+    socket.on('user-not-found', (data) => {
+        const resultDiv = document.getElementById('friendLookupResult');
+        resultDiv.innerHTML = `<p style="color: var(--danger); font-size: 0.9rem;">${data.message}</p>`;
+        setTimeout(() => {
+            resultDiv.innerHTML = '';
+        }, 3000);
+    });
+
+    // Friend request sent
+    socket.on('friend-request-sent', () => {
+        showToast('✅ Friend request sent!');
+    });
+
+    // Friend request received
+    socket.on('friend-request-received', (data) => {
+        showToast(`👋 Friend request from ${data.senderUsername}`);
+        socket.emit('get-pending-requests');
+    });
+
+    // Display pending requests
+    socket.on('pending-requests', (requests) => {
+        const requestsDiv = document.getElementById('pendingRequests');
+        if (requests.length === 0) {
+            requestsDiv.innerHTML = '';
+            return;
+        }
+
+        requestsDiv.innerHTML = '<h4>📬 Pending Requests</h4>';
+        requests.forEach(req => {
+            const div = document.createElement('div');
+            div.className = 'friend-request-item';
+            div.innerHTML = `
+                <span>${req.sender_username}</span>
+                <div>
+                    <button class="btn btn-sm btn-success" onclick="acceptFriendRequest(${req.id})">✓</button>
+                    <button class="btn btn-sm btn-danger" onclick="declineFriendRequest(${req.id})">✕</button>
+                </div>
+            `;
+            requestsDiv.appendChild(div);
+        });
+    });
+
+    // Friend added
+    socket.on('friend-added', () => {
+        showToast('✅ Friend added!');
+        socket.emit('get-friends');
+        socket.emit('get-pending-requests');
+    });
+
+    // Friend request accepted
+    socket.on('friend-request-accepted', (data) => {
+        showToast(`✅ ${data.username} accepted your friend request!`);
+        socket.emit('get-friends');
+    });
+
+    // Refresh friends
+    socket.on('refresh-friends', () => {
+        socket.emit('get-friends');
+    });
+
+    // Display friends list
+    socket.on('friends-list', (friends) => {
+        friendsList = friends;
+        const friendsDiv = document.getElementById('friendsList');
+
+        if (friends.length === 0) {
+            friendsDiv.innerHTML = '<p style="text-align: center; opacity: 0.6; margin-top: 20px;">No friends yet</p>';
+            return;
+        }
+
+        friendsDiv.innerHTML = '<h4>👥 Friends</h4>';
+        friends.forEach(friend => {
+            const unreadCount = unreadCounts[friend.id] || 0;
+            const div = document.createElement('div');
+            div.className = 'friend-item';
+            div.onclick = () => openDM(friend);
+            div.innerHTML = `
+                <div style="display: flex; align-items: center;">
+                    <span class="friend-status status-${friend.status || 'offline'}"></span>
+                    <span>${friend.username}</span>
+                </div>
+                ${unreadCount > 0 ? `<span class="unread-badge">${unreadCount}</span>` : ''}
+            `;
+            friendsDiv.appendChild(div);
+        });
+    });
+
+    // DM sent
+    socket.on('dm-sent', (data) => {
+        const messagesDiv = document.getElementById('dmMessages');
+        const msgDiv = document.createElement('div');
+        msgDiv.className = 'dm-message dm-sent';
+        msgDiv.textContent = data.message;
+        messagesDiv.appendChild(msgDiv);
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    });
+
+    // DM received
+    socket.on('dm-received', (data) => {
+        if (currentDMFriend && currentDMFriend.id === data.senderId) {
+            const messagesDiv = document.getElementById('dmMessages');
+            const msgDiv = document.createElement('div');
+            msgDiv.className = 'dm-message dm-received';
+            msgDiv.textContent = data.message;
+            messagesDiv.appendChild(msgDiv);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+
+            socket.emit('mark-dm-read', { senderId: data.senderId });
+        } else {
+            unreadCounts[data.senderId] = (unreadCounts[data.senderId] || 0) + 1;
+            socket.emit('get-friends');
+            showToast(`💬 New message from ${data.senderUsername}`);
+        }
+    });
+
+    // DM history
+    socket.on('dm-history', (messages) => {
+        const messagesDiv = document.getElementById('dmMessages');
+        messagesDiv.innerHTML = '';
+
+        if (messages.length === 0) {
+            messagesDiv.innerHTML = '<p style="text-align: center; opacity: 0.6;">No messages yet. Say hi! 👋</p>';
+            return;
+        }
+
+        messages.forEach(msg => {
+            const isMe = msg.sender_id === currentUser.id;
+            const msgDiv = document.createElement('div');
+            msgDiv.className = `dm-message ${isMe ? 'dm-sent' : 'dm-received'}`;
+            msgDiv.textContent = msg.message;
+            messagesDiv.appendChild(msgDiv);
+        });
+
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    });
+
+    // Unread counts
+    socket.on('unread-counts', (counts) => {
+        unreadCounts = {};
+        counts.forEach(item => {
+            unreadCounts[item.sender_id] = parseInt(item.unread_count);
+        });
+        socket.emit('get-friends');
+    });
+
+    // DM marked as read
+    socket.on('dm-marked-read', (data) => {
+        if (unreadCounts[data.senderId]) {
+            delete unreadCounts[data.senderId];
+            socket.emit('get-friends');
+        }
+    });
+
+    // Friend request declined
+    socket.on('friend-request-declined', (data) => {
+        socket.emit('get-pending-requests');
+    });
+}
+
+// UI Functions (these don't use socket directly)
+function copyMyCode() {
+    navigator.clipboard.writeText(myInvitationCode);
+    showToast('✅ Invitation code copied!');
+}
+
+function lookupFriend() {
+    const code = document.getElementById('friendCodeInput').value.trim().toUpperCase();
+    if (!code || code.length < 6) {
+        showToast('⚠️ Please enter a valid code');
+        return;
+    }
+    socket.emit('lookup-user-by-code', { invitationCode: code });
+}
+
+function sendFriendRequest(receiverId) {
+    socket.emit('send-friend-request', { receiverId });
+    document.getElementById('friendCodeInput').value = '';
+    document.getElementById('friendLookupResult').innerHTML = '';
+}
+
+function acceptFriendRequest(requestId) {
+    socket.emit('accept-friend-request', { requestId });
+}
+
+function declineFriendRequest(requestId) {
+    socket.emit('decline-friend-request', { requestId });
+}
+
+function openDM(friend) {
+    currentDMFriend = friend;
+    document.getElementById('dmUsername').textContent = friend.username;
+    document.getElementById('dmModal').style.display = 'flex';
+    document.getElementById('dmMessages').innerHTML = '';
+
+    socket.emit('get-dm-history', { friendId: friend.id });
+    socket.emit('mark-dm-read', { senderId: friend.id });
+}
+
+function closeDM() {
+    document.getElementById('dmModal').style.display = 'none';
+    currentDMFriend = null;
+    document.getElementById('dmInput').value = '';
+}
+
+function sendDM() {
+    const input = document.getElementById('dmInput');
+    const message = input.value.trim();
+
+    if (!message || !currentDMFriend) return;
+
+    socket.emit('send-dm', {
+        receiverId: currentDMFriend.id,
+        message
+    });
+
+    input.value = '';
+}
+
+// Event listeners for Enter key
+document.addEventListener('DOMContentLoaded', () => {
+    const dmInput = document.getElementById('dmInput');
+    if (dmInput) {
+        dmInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                sendDM();
+            }
+        });
+    }
+
+    const friendCodeInput = document.getElementById('friendCodeInput');
+    if (friendCodeInput) {
+        friendCodeInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                lookupFriend();
+            }
+        });
+    }
+});

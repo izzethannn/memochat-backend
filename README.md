@@ -1,12 +1,22 @@
-# 📝 MemoChat v2.1.1
+# 📝 MemoChat v2.2.0
 
-A real-time voice chat and screen sharing application built with Node.js, Socket.IO, and WebRTC. Now with enhanced security, user authentication, volume controls, advanced spam protection, and **Docker support**!
+A real-time voice chat and screen sharing application built with Node.js, Socket.IO, and WebRTC. Now with **Friend System**, enhanced security, user authentication, volume controls, advanced spam protection, and Docker support!
 
 ![MemoChat Demo](https://img.shields.io/badge/Status-Live-brightgreen)
 ![Node.js](https://img.shields.io/badge/Node.js-v18+-blue)
 ![Socket.IO](https://img.shields.io/badge/Socket.IO-v4.7-red)
 ![Security](https://img.shields.io/badge/Security-Enhanced-green)
 ![Docker](https://img.shields.io/badge/Docker-Ready-blue)
+
+## 🎉 What's New in v2.2.0
+
+### 👥 **Friend System** (NEW!)
+- **Invitation Codes** - Unique code for each user to share with friends
+- **Friend Requests** - Send and accept friend requests using invitation codes
+- **Direct Messaging** - Private 1-on-1 chat with friends
+- **Friends List** - See all your friends with online status indicators
+- **Real-time Notifications** - Get notified when friends send messages or requests
+- **Unread Message Badges** - Never miss a message from friends
 
 ## 🎉 What's New in v2.1.1
 
@@ -65,6 +75,7 @@ A real-time voice chat and screen sharing application built with Node.js, Socket
 ## 🎯 Core Features
 
 - 🔐 **Secure Authentication** - Registration, login, and session management
+- 👥 **Friend System** - Add friends, send DMs, and manage your network
 - 🎤 **Real-time Voice Chat** - Crystal clear audio communication
 - 💬 **Text Messaging** - Instant chat with message history
 - 📺 **Screen Sharing** - Share your screen with participants
@@ -406,10 +417,10 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 🔮 Future Features
 
+- [x] **Friend System** and private messaging ✅ *Implemented in v2.2.0!*
 - [ ] **Database Integration** for persistent user accounts and rooms
 - [ ] **Real Input Volume Control** using Web Audio API
 - [ ] **User Profiles** with avatars and preferences
-- [ ] **Friend System** and private messaging
 - [ ] **File Sharing** in chat with security scanning
 - [ ] **Voice Recording** and playback features
 - [ ] **Mobile App** (React Native)
@@ -421,7 +432,35 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 🆕 Changelog
 
-### Version 2.1.1 (Latest)
+### Version 2.2.0 (Latest)
+**👥 Friend System Update**
+
+#### Added
+- ✅ **Friend System**: Complete friend management with invitation codes
+- ✅ **Invitation Codes**: Unique 8-character code for each user
+- ✅ **Friend Requests**: Send and accept friend requests
+- ✅ **Direct Messaging**: Private 1-on-1 chat with friends
+- ✅ **Friends List**: View all friends with online/offline status
+- ✅ **Unread Messages**: Badge indicators for new DM messages
+- ✅ **Real-time Notifications**: Toast notifications for friend activities
+- ✅ **Friend System UI**: Dedicated sidebar section with modern design
+- ✅ **Supabase Integration**: PostgreSQL database for persistent friend data
+
+#### Improved
+- ✅ **UI/UX**: Cleaner sidebar layout with better spacing
+- ✅ **Chat Input**: Fixed text visibility issues
+- ✅ **Users List**: Auto-hide when not in a voice channel
+- ✅ **Button Layout**: Side-by-side Settings and Logout buttons
+- ✅ **CSS Organization**: Separated friend-system.css for better maintainability
+
+#### Fixed
+- ✅ **Input Text Color**: All inputs now have proper white text
+- ✅ **Socket Initialization**: Friend system loads after socket connection
+- ✅ **Empty States**: Proper handling of empty friend lists and users lists
+
+---
+
+### Version 2.1.1
 **🐳 Docker & Deployment Update**
 
 #### Added
